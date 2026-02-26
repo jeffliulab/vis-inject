@@ -39,6 +39,8 @@ logs_and_outputs_archive
 demo_images
 sample
 sample_archive
+demo_screenshots
+demo_screenshots_archive
 
 # ---- HuggingFace / PyTorch 缓存（位于用户目录，不在项目内）----
 .cache/
