@@ -74,7 +74,7 @@ git commit -m "stage1a ready for HPC"
 git push
 
 # HPC 上拉取
-git clone https://github.com/yourname/VisInject.git
+git clone https://github.com/jeffliulab/vis_inject
 # 或
 git pull
 ```
