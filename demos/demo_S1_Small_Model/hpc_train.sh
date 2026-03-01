@@ -14,48 +14,78 @@
 
 set -euo pipefail
 
-# (可选) 课上环境模块；如果你不需要 module 也可以删掉
-module load class
-module load ee110/2025fall-1
+############################
+# 0) 绝对路径配置（按你当前实际环境）
+############################
+ENV_DIR="/cluster/tufts/c26sp1ee0141/pliu07/condaenv/visinject"
+PYTHON="${ENV_DIR}/bin/python"
 
-# --- 你的路径（按你当前实际情况写死，避免 sbatch 环境变量不一致） ---
-ENV_PATH="/cluster/tufts/c26sp1ee0141/pliu07/condaenv/visinject"
-REPO_DIR="/cluster/tufts/c26sp1ee0141/pliu07/vis_inject/demos/demo_S1_Small_Model"
-HF_CACHE="/cluster/tufts/c26sp1ee0141/pliu07/model_cache"
+DEMO_DIR="/cluster/tufts/c26sp1ee0141/pliu07/vis_inject/demos/demo_S1_Small_Model"
+LOG_DIR="${DEMO_DIR}/logs"
 
-mkdir -p "${REPO_DIR}/logs"
+HF_HOME="/cluster/tufts/c26sp1ee0141/pliu07/model_cache"
+HF_HUB_CACHE="${HF_HOME}/hub"
+TRANSFORMERS_CACHE="${HF_HOME}/transformers"
+HF_DATASETS_CACHE="${HF_HOME}/datasets"
 
-# 激活 conda（注意：很多集群需要先 source conda.sh 才能用 conda activate）
-if [ -f "${ENV_PATH}/etc/profile.d/conda.sh" ]; then
-  source "${ENV_PATH}/etc/profile.d/conda.sh"
-fi
-conda activate "${ENV_PATH}"
+############################
+# 1) 可选：模块（如果你们集群跑 Python/GPU 必须加载，就保留）
+############################
+module load class || true
+module load ee110/2025fall-1 || true
 
-# HuggingFace 缓存（建议在脚本里再设一遍，避免非交互 shell 没读到 ~/.bashrc）
-export HF_HOME="${HF_CACHE}"
-export HF_HUB_CACHE="${HF_CACHE}/hub"
-export TRANSFORMERS_CACHE="${HF_CACHE}/transformers"
-export HF_DATASETS_CACHE="${HF_CACHE}/datasets"
+############################
+# 2) 目录准备
+############################
+mkdir -p "${LOG_DIR}"
+mkdir -p "${HF_HOME}" "${HF_HUB_CACHE}" "${TRANSFORMERS_CACHE}" "${HF_DATASETS_CACHE}"
 
-# CUDA 内存碎片优化（你指南里提到的那条）
+############################
+# 3) 环境变量（全部在脚本内设置，避免 sbatch 不读 ~/.bashrc）
+############################
+export HF_HOME="${HF_HOME}"
+export HF_HUB_CACHE="${HF_HUB_CACHE}"
+export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE}"
+export HF_DATASETS_CACHE="${HF_DATASETS_CACHE}"
+
+# 关键：CUDA 内存碎片优化（你指南里提到的）
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-# CPU 线程数（跟 -c 对齐）
+# 线程数对齐
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8}
 
-cd "${REPO_DIR}"
-
-# 记录环境信息（定位问题很有用）
-echo "===== SLURM JOB INFO ====="
+############################
+# 4) 基本自检（出问题时看日志就能定位）
+############################
+echo "===== JOB ENV CHECK ====="
 echo "JobID: ${SLURM_JOB_ID}"
 echo "Node : ${SLURM_NODELIST}"
-echo "GPU  : ${SLURM_JOB_GPUS:-unknown}"
-nvidia-smi || true
-python -V
-which python
-echo "HF_HOME=${HF_HOME}"
-echo "=========================="
+echo "CWD  : $(pwd)"
+echo "PYTHON: ${PYTHON}"
+echo "DEMO_DIR: ${DEMO_DIR}"
+echo "HF_HOME: ${HF_HOME}"
+echo "HF_HUB_CACHE: ${HF_HUB_CACHE}"
+echo "SLURM_CPUS_PER_TASK: ${SLURM_CPUS_PER_TASK:-unset}"
+echo "========================="
 
-# 用 srun 启动更标准（比直接 python 更好地继承资源绑定）
+if [ ! -x "${PYTHON}" ]; then
+  echo "[FATAL] Python not found/executable at: ${PYTHON}"
+  exit 2
+fi
+
+${PYTHON} -V
+${PYTHON} -c "import sys; print('sys.executable=', sys.executable)"
+
+echo "----- nvidia-smi -----"
+nvidia-smi || true
+echo "----------------------"
+
+############################
+# 5) 启动训练（使用 srun 更规范）
+############################
+cd "${DEMO_DIR}"
+
+# 如果你想先跑短调试，把下一行改成：
+# srun -n 1 -c ${SLURM_CPUS_PER_TASK:-8} ${PYTHON} run_demo.py --stage1a --num-images 5
 srun -n 1 -c ${SLURM_CPUS_PER_TASK:-8} \
-  python run_demo.py --stage1a
+  ${PYTHON} run_demo.py --stage1a
