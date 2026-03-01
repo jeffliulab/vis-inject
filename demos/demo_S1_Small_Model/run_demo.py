@@ -146,8 +146,10 @@ def main():
         mode_list()
 
     elif args.stage1a:
-        from training.proxy_trainer import ProxyTrainer
-        trainer = ProxyTrainer(stage="1a")
+        # 使用端到端训练（E2E）：直接通过 Qwen CE loss 训练 StegoEncoder
+        # 比代理特征损失 (proxy feature loss) 更直接，训练信号更强
+        from training.e2e_trainer import E2ETrainer
+        trainer = E2ETrainer(stage="1a")
         trainer.run()
 
     elif args.stage1b:

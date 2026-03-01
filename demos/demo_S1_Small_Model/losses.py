@@ -152,11 +152,10 @@ class MultiEncoderProxyLoss(nn.Module):
                                         size=(enc.img_size, enc.img_size),
                                         mode="bilinear", align_corners=False)
 
-            # 编码器专用归一化
-            normed = enc.normalize(aug_img)
-
-            # 提取特征（编码器已冻结，但需要梯度流过去用于 proxy loss）
-            feat_adv = enc.encode(normed)   # [B, D] 或 [B, N, D]
+            # 提取特征（编码器已冻结，参数不会更新，但梯度需要流回 adv_img）
+            # 使用 resize_and_encode 以支持各编码器自定义归一化流程
+            # aug_img 已是 enc.img_size 尺寸，resize_and_encode 会跳过 resize 步骤
+            feat_adv = enc.resize_and_encode(aug_img)   # [B, D]
             if feat_adv.dim() == 3:
                 feat_adv = feat_adv.mean(dim=1)
 

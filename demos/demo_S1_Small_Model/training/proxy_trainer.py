@@ -161,6 +161,10 @@ class ProxyTrainer:
         augmentor = DifferentiableAugmentor()
 
         # ---- 数据 ----
+        # 使用编码器的 img_size 加载图像（Qwen=392，需是 patch_size*merge_size=28 的倍数）
+        img_size = encoders[0].img_size if encoders else 256
+        self.logger.info(f"图像分辨率: {img_size}×{img_size}")
+
         image_paths = load_image_paths("data/train", self.stage_cfg["num_images"])
         self.logger.info(f"图像数量: {len(image_paths)}")
 
@@ -181,10 +185,10 @@ class ProxyTrainer:
                              leave=False)
 
             for batch_paths in epoch_bar:
-                # 加载 batch 图像
+                # 加载 batch 图像（按编码器 img_size 加载，保证分辨率正确）
                 imgs = []
                 for p in batch_paths:
-                    t = load_image_tensor(p, self.device)
+                    t = load_image_tensor(p, self.device, size=img_size)
                     if t is not None:
                         imgs.append(t)
                 if not imgs:

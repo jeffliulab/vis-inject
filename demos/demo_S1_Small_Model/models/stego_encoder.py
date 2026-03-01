@@ -313,6 +313,15 @@ class StegoEncoder(nn.Module):
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
+        # 关键：将输出头最后一层归零初始化，确保初始扰动接近 0 而非饱和。
+        # 若最后一层输出大值，tanh/clamp 会立即饱和导致梯度为零，训练无效。
+        # 归零后，tanh(0/eps)=0，梯度=1/eps（最大），训练从小扰动逐步增长。
+        last_conv = self.head[-1]
+        if isinstance(last_conv, nn.Conv2d):
+            nn.init.zeros_(last_conv.weight)
+            if last_conv.bias is not None:
+                nn.init.zeros_(last_conv.bias)
+
     def _unet_forward(self, x: torch.Tensor,
                       film_cond: Optional[torch.Tensor] = None) -> torch.Tensor:
         """U-Net 前向传播，返回原始输出（未约束）"""
@@ -366,18 +375,25 @@ class StegoEncoder(nn.Module):
         主前向传播。
         输入：images [B, 3, H, W]，值域 [0, 1]
         输出：adv_images [B, 3, H, W]，值域 [0, 1]，扰动 L∞ ≤ epsilon
+
+        关键设计：L∞ 归一化约束（不饱和，梯度处处非零）。
+        传统 clamp/tanh 在 L∞ 边界饱和导致梯度消失。
+        归一化方案：delta_normalized = delta × (eps / max|delta|)，纯线性操作，
+        梯度完整流通，且保证每张图扰动幅度 = eps。
         """
         # U-Net 输出
         raw_delta = self.head(self._run_unet(images, film_cond))
 
-        # DCT 中频约束
+        # DCT 中频约束（线性变换，梯度正常流通）
         adv_img = self.apply_dct_constraint(images, raw_delta)
-
-        # L∞ 约束：扰动幅度不超过 epsilon
         delta = adv_img - images
-        delta = torch.clamp(delta, -self.epsilon, self.epsilon)
-        adv_img = torch.clamp(images + delta, 0.0, 1.0)
 
+        # L∞ 归一化：将扰动缩放至 max|delta| = epsilon（线性，无饱和）
+        # 这与 PGD 的 sign(grad)*alpha 思路相同：固定幅度，只学习方向
+        delta_linf = delta.abs().amax(dim=(1, 2, 3), keepdim=True).clamp_min(1e-8)
+        delta_normalized = delta * (self.epsilon / delta_linf)
+
+        adv_img = torch.clamp(images + delta_normalized, 0.0, 1.0)
         return adv_img
 
     def _run_unet(self, x: torch.Tensor,

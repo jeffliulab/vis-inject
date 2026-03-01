@@ -210,6 +210,38 @@ def scale_and_restore(images: Tensor, scale: float = None) -> Tensor:
     return restored
 
 
+def png_to_jpg_roundtrip(images: Tensor, quality: int = 95) -> Tensor:
+    """
+    PNG→JPG 格式转换模拟（非可微，但支持评估）：
+    tensor → PIL Image → JPEG encode → JPEG decode → tensor
+    模拟将 PNG 对抗图像另存为 JPG 再读取的格式转换损失。
+    """
+    import io
+    from PIL import Image as PILImage
+    import numpy as np
+
+    B, C, H, W = images.shape
+    results = []
+    imgs_np = (images.detach().cpu().float().clamp(0, 1) * 255).byte().numpy()  # [B, C, H, W]
+
+    for b in range(B):
+        # [C, H, W] → [H, W, C]
+        arr = imgs_np[b].transpose(1, 2, 0)
+        pil_img = PILImage.fromarray(arr, mode="RGB")
+
+        buf = io.BytesIO()
+        pil_img.save(buf, format="JPEG", quality=quality)
+        buf.seek(0)
+        jpg_img = PILImage.open(buf).convert("RGB")
+
+        arr_back = np.array(jpg_img, dtype=np.float32) / 255.0
+        t = torch.from_numpy(arr_back).permute(2, 0, 1)  # [C, H, W]
+        results.append(t)
+
+    out = torch.stack(results, dim=0).to(images.device)
+    return out
+
+
 def screenshot_simulate(images: Tensor) -> Tensor:
     """
     截图模拟：先用双线性降采样再上采样，加轻微高斯模糊，再量化。
@@ -280,6 +312,8 @@ class DifferentiableAugmentor:
             return random_crop_and_pad(images)
         elif distortion == "quantize":
             return quantize_ste(images)
+        elif distortion == "png_to_jpg":
+            return png_to_jpg_roundtrip(images, quality=95)
         else:
             return images
 

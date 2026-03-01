@@ -2,11 +2,17 @@
 # VisInject 项目 .gitignore
 # ============================================================
 
+data
+test
+
 # ---- Python 字节码 ----
 __pycache__/
 *.py[cod]
 *$py.class
 *.pyo
+
+# ---- 统一模型缓存目录（HuggingFace 权重，体积大）----
+model_cache/
 
 # ---- 训练数据（图像数据集，体积大）----
 # 通过 prepare_data.py 生成，不纳入版本控制
