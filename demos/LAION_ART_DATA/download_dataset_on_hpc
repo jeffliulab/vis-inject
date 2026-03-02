@@ -1,0 +1,24 @@
+/cluster/tufts/c26sp1ee0141/pliu07/condaenv/visinject/bin/python -c "
+from huggingface_hub import HfApi, hf_hub_download
+import os
+
+token = open('/cluster/home/pliu07/.cache/huggingface/token').read().strip()
+api = HfApi(token=token)
+out_dir = '/cluster/tufts/c26sp1ee0141/pliu07/LAION_ART/metadata'
+os.makedirs(out_dir, exist_ok=True)
+
+files = api.list_repo_files('laion/laion-art', repo_type='dataset')
+parquets = [f for f in files if f.endswith('.parquet') and not f.startswith('.')]
+print(f'Found {len(parquets)} parquet files')
+
+for i, pf in enumerate(parquets):
+    print(f'[{i+1}/{len(parquets)}] Downloading {pf}...')
+    hf_hub_download(
+        repo_id='laion/laion-art',
+        repo_type='dataset',
+        filename=pf,
+        local_dir=out_dir,
+        token=token
+    )
+print('Done!')
+"

@@ -1,146 +1,179 @@
-# LAION-Art Dataset for AnyAttack Pre-training
+# LAION-Art Dataset Download
 
-## Overview
+Downloads LAION-Art (~8M art images) for AnyAttack (demo_S2) pre-training.
 
-LAION-Art is a curated subset of LAION-5B containing **~8 million** high-quality images
-(aesthetic score > 8, watermark probability < 0.8, unsafe probability < 0.5).
+## Architecture
 
-This dataset is used for self-supervised pre-training of the AnyAttack Decoder network
-(see `demo_S2_AnyAttack`).
+```
+HPC Login Node                          HPC Compute Node (batch job)
+─────────────                           ────────────────────────────
+1. huggingface-cli login                3. sbatch download_laion_art.sh test
+2. download_parquet_metadata.sh         4. sbatch download_laion_art.sh full
+   (128 parquet shards → metadata/)     5. sbatch download_laion_art.sh resume
+                                           ↓
+                                        download_images.py
+                                           reads metadata/*.parquet
+                                           downloads images from source URLs
+                                           resizes to 224x224, center crop
+                                           writes WebDataset .tar shards
+                                           ↓
+                                        webdataset/00000.tar, 00001.tar, ...
+```
 
-**Paper**: [AnyAttack: Towards Large-scale Self-supervised Adversarial Attacks on Vision-language Models](https://arxiv.org/abs/2410.05346) (CVPR 2025)
+**Why two steps?**  Compute nodes on Tufts HPC cannot resolve
+`cdn-lfs.huggingface.co` (DNS blocked), so parquet metadata must be
+downloaded on the login node. Image URLs point to external hosts which
+compute nodes *can* access.
 
-## Storage Requirements
-
-| Item | Size |
-|------|------|
-| Parquet metadata | ~500 MB |
-| Images (224x224 WebDataset) | ~80-150 GB |
-| **Total** | **~80-150 GB** |
-
-## Download Instructions
-
-### Step 1: Test the setup (recommended)
+## Prerequisites
 
 ```bash
-# Test with 100 images first to verify network access and dependencies
+# Python packages (already in visinject conda env)
+pip install pyarrow Pillow
+
+# HuggingFace authentication (one-time, on login node)
+mkdir -p ~/.cache/huggingface
+echo "hf_YOUR_TOKEN_HERE" > ~/.cache/huggingface/token
+
+# Get your token at: https://huggingface.co/settings/tokens
+# Accept dataset terms at: https://huggingface.co/datasets/laion/laion-art
+```
+
+## Step 1: Download Parquet Metadata (Login Node)
+
+The dataset metadata is split into 128 parquet shards (~1.3 GB total).
+Run this on the **login node** (has full internet access):
+
+```bash
+cd /path/to/demos/LAION_ART_DATA
+bash download_parquet_metadata.sh
+```
+
+Or manually:
+
+```bash
+/cluster/tufts/c26sp1ee0141/pliu07/condaenv/visinject/bin/python -c "
+from huggingface_hub import HfApi, hf_hub_download
+import os
+token = open(os.path.expanduser('~/.cache/huggingface/token')).read().strip()
+api = HfApi(token=token)
+out_dir = '/cluster/tufts/c26sp1ee0141/pliu07/LAION_ART/metadata'
+os.makedirs(out_dir, exist_ok=True)
+files = api.list_repo_files('laion/laion-art', repo_type='dataset')
+parquets = [f for f in files if f.endswith('.parquet') and not f.startswith('.')]
+print(f'Found {len(parquets)} parquet files')
+for i, pf in enumerate(parquets):
+    print(f'[{i+1}/{len(parquets)}] {pf}')
+    hf_hub_download('laion/laion-art', repo_type='dataset',
+                    filename=pf, local_dir=out_dir, token=token)
+print('Done!')
+"
+```
+
+Use `screen` or `tmux` to prevent SSH disconnection:
+```bash
+screen -S parquet_download
+# run the command above
+# Ctrl+A, D to detach; screen -r parquet_download to reattach
+```
+
+## Step 2: Test Image Download (Compute Node)
+
+```bash
+cd /path/to/demos/LAION_ART_DATA
 sbatch download_laion_art.sh test
 ```
 
-This downloads 100 images to `webdataset_test/` and takes about 1 minute.
-Check the SLURM log to verify it worked before starting the full download.
+This downloads 100 images to verify the setup works. Check the output:
+```bash
+cat /cluster/tufts/c26sp1ee0141/pliu07/LAION_ART/logs/download_<JOBID>.out
+```
 
-### Step 2: Start full download
+## Step 3: Full Download
 
 ```bash
 sbatch download_laion_art.sh full
 ```
 
-### Step 3: If the job times out, resume
+## Step 4: Resume (if job times out)
 
-The downloader tracks progress in a `.download_state.json` file and supports
-full resume. Simply resubmit:
+The downloader saves progress to `.download_state.json`. Simply resubmit:
 
 ```bash
 sbatch download_laion_art.sh resume
 ```
 
-Repeat until the download completes.
+Repeat until complete.
 
-### Step 4: Monitor progress
-
-```bash
-# Check job status
-squeue -u $USER
-
-# Watch the log file
-tail -f /cluster/tufts/c26sp1ee0141/pliu07/LAION_ART/logs/download_<JOBID>.out
-```
-
-### Step 5: Verify the dataset
+## Step 5: Verify
 
 ```bash
-python verify_dataset.py --data-dir /cluster/tufts/c26sp1ee0141/pliu07/LAION_ART/webdataset
+python verify_dataset.py
+python verify_dataset.py --check-images   # thorough check (slower)
 ```
 
-## Dependencies
-
-The downloader (`download_images.py`) uses **only standard/common libraries**
--- no `img2dataset` needed:
-
-- `pyarrow` -- parquet file reading
-- `Pillow` -- image resize/crop
-- Python stdlib: `urllib`, `concurrent.futures`, `tarfile`, `json`
-
-Both `pyarrow` and `Pillow` are auto-installed by the SLURM script if missing.
-
-## Output Structure
+## File Structure
 
 ```
-/cluster/tufts/c26sp1ee0141/pliu07/LAION_ART/
-  metadata/
-    laion-art.parquet        # URL + caption metadata
-  webdataset/
-    00000.tar                # Each tar contains ~10K image-text pairs
-    00001.tar
-    ...
-    00xxx.tar
-  logs/
-    download_<jobid>.out     # SLURM output logs
-    download_<jobid>.err
+LAION_ART_DATA/
+├── download_images.py          # Main downloader (no img2dataset needed)
+├── download_laion_art.sh       # SLURM batch script
+├── download_parquet_metadata.sh # Parquet download helper (login node)
+├── download_dataset_on_hpc     # Quick-reference parquet download command
+├── verify_dataset.py           # Post-download verification
+└── README.md
+
+/cluster/.../LAION_ART/
+├── metadata/                   # 128 parquet shards (pre-downloaded)
+│   ├── part-00000-*.snappy.parquet
+│   ├── part-00001-*.snappy.parquet
+│   └── ...
+├── webdataset/                 # Downloaded images (WebDataset format)
+│   ├── 00000.tar
+│   ├── 00001.tar
+│   ├── ...
+│   └── .download_state.json
+├── webdataset_test/            # Test download output
+└── logs/
+    ├── download_YYYYMMDD_HHMMSS.log      # Full run log
+    ├── failed_urls_YYYYMMDD_HHMMSS.log   # Every failed URL + reason
+    └── error_snapshot_YYYYMMDD_HHMMSS.json # Error category counts
 ```
 
-Each `.tar` shard contains files like:
-```
-000000000.jpg    # Image (224x224, JPEG quality 95)
-000000000.txt    # Caption text
-000000000.json   # Metadata (similarity, aesthetic score, etc.)
-```
+## Log Files
 
-## Usage in AnyAttack Pre-training
+Each run generates comprehensive logs for debugging:
 
-The WebDataset tar files are loaded directly by `demo_S2_AnyAttack/pretrain.py`
-using the `webdataset` library for efficient streaming:
+| File | Content |
+|------|---------|
+| `download_*.log` | Full log: system info, SLURM env, config, progress, final report |
+| `failed_urls_*.log` | One line per failed URL with error category and row index |
+| `error_snapshot_*.json` | JSON: error counts by category + last 50 error details |
+| `.download_state.json` | Resume state: completed rows, success/fail counts, session history |
 
-```python
-import webdataset as wds
-
-dataset = (
-    wds.WebDataset(tar_files, resampled=True, shardshuffle=True)
-    .shuffle(5000)
-    .decode("pil")
-    .to_tuple("jpg", "txt")
-    .map(transform_fn)
-    .batched(batch_size)
-)
-```
+Error categories tracked: `timeout`, `dns_failure`, `connection_refused`,
+`connection_reset`, `ssl_error`, `http_404`, `http_403`, `http_other`,
+`invalid_url`, `empty_response`, `image_corrupt`, `image_too_small`,
+`pillow_error`, `unknown`.
 
 ## Troubleshooting
 
-**Q: Many URLs return 404 errors?**
-A: This is expected. LAION datasets are crawled from the web and URLs expire over time.
-Typically 20-40% of URLs are dead. img2dataset handles this gracefully and logs failures.
-You should still get 5-6 million usable images, which is sufficient for pre-training.
+**Q: "No parquet files found"**
+A: You need to download parquet metadata on the login node first (Step 1).
+Compute nodes cannot access HuggingFace CDN.
 
-**Q: img2dataset installation fails?**
-A: The new `download_images.py` does not use img2dataset at all. It only needs
-`pyarrow` and `Pillow`, which are much easier to install. The SLURM script
-auto-installs them if missing.
+**Q: Very low success rate?**
+A: LAION URLs are from 2022; many hosts are gone. 40-60% success rate is
+normal. Check `failed_urls_*.log` for the dominant error category.
 
-**Q: The download is very slow?**
-A: Adjust `--workers` (default 32). On a slow network, try `--workers 8`.
-If only login nodes can reach the internet, run interactively with `screen` or `tmux`:
-```bash
-screen -S download
-python download_images.py --workers 16 --resume
-```
+**Q: Job timed out before finishing?**
+A: Just run `sbatch download_laion_art.sh resume`. Progress is saved
+automatically.
 
-**Q: "Permission denied" or "Disk quota exceeded"?**
-A: Check your storage quota with `quota -s` or equivalent. LAION-Art needs 80-150 GB.
-Consider using `$SCRATCH` if your home directory quota is limited.
+**Q: How much disk space needed?**
+A: ~80-150 GB for the images (depends on success rate). Parquet metadata
+is ~1.3 GB. Check with `df -h /cluster/tufts/c26sp1ee0141/pliu07/`.
 
-**Q: How do I download only a subset?**
-A: Use `--start-shard` and `--end-shard` to download a range:
-```bash
-python download_images.py --start-shard 0 --end-shard 10  # first 100K images
-```
+**Q: Download is slow?**
+A: Adjust `--workers` in the SLURM script. Default is 32 threads. On
+slow networks try 8-16; on fast networks try 48-64.

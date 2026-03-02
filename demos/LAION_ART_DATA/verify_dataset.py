@@ -1,146 +1,117 @@
 """
-Verify LAION-Art WebDataset download completeness.
+Verify downloaded LAION-Art WebDataset shards.
+
+Checks:
+  - Number of .tar shards and total images
+  - Shard integrity (can open and list members)
+  - Image readability (Pillow can decode JPEG)
+  - Caption file presence
+  - Reports corrupted shards and missing files
 
 Usage:
     python verify_dataset.py
     python verify_dataset.py --data-dir /path/to/webdataset
-    python verify_dataset.py --data-dir /path/to/webdataset --show-samples 5
+    python verify_dataset.py --check-images    # also verify each image is decodable
 """
 
 import argparse
-import glob
-import os
-import tarfile
+import json
 import sys
+import tarfile
 from pathlib import Path
 
 
-DEFAULT_DATA_DIR = "/cluster/tufts/c26sp1ee0141/pliu07/LAION_ART/webdataset"
-EXPECTED_TOTAL_IMAGES = 8_000_000
-EXPECTED_IMAGES_PER_SHARD = 10_000
-
-
-def count_shard_images(tar_path: str) -> dict:
-    """Count images and check integrity of a single tar shard."""
-    result = {"path": tar_path, "images": 0, "texts": 0, "size_mb": 0, "error": None}
-    try:
-        result["size_mb"] = os.path.getsize(tar_path) / (1024 * 1024)
-        with tarfile.open(tar_path, "r") as t:
-            members = t.getmembers()
-            result["images"] = sum(1 for m in members if m.name.endswith((".jpg", ".png", ".webp")))
-            result["texts"] = sum(1 for m in members if m.name.endswith(".txt"))
-    except Exception as e:
-        result["error"] = str(e)
-    return result
-
-
-def show_samples(tar_path: str, n: int = 3):
-    """Display a few sample entries from a tar shard."""
-    try:
-        with tarfile.open(tar_path, "r") as t:
-            txt_members = [m for m in t.getmembers() if m.name.endswith(".txt")][:n]
-            for m in txt_members:
-                f = t.extractfile(m)
-                if f:
-                    caption = f.read().decode("utf-8", errors="replace").strip()
-                    img_name = m.name.replace(".txt", ".jpg")
-                    print(f"    {img_name}: {caption[:100]}...")
-    except Exception as e:
-        print(f"    Error reading samples: {e}")
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Verify LAION-Art WebDataset download")
-    parser.add_argument("--data-dir", type=str, default=DEFAULT_DATA_DIR,
-                        help="Path to WebDataset directory containing .tar files")
-    parser.add_argument("--show-samples", type=int, default=0,
-                        help="Show N sample captions from the first shard")
-    parser.add_argument("--detailed", action="store_true",
-                        help="Show per-shard statistics")
-    args = parser.parse_args()
-
-    data_dir = Path(args.data_dir)
-    if not data_dir.exists():
-        print(f"[ERROR] Directory not found: {data_dir}")
+def verify(data_dir: str, check_images: bool = False):
+    dpath = Path(data_dir)
+    if not dpath.is_dir():
+        print(f"[ERROR] Directory not found: {dpath}")
         sys.exit(1)
 
-    tar_files = sorted(glob.glob(str(data_dir / "*.tar")))
+    tar_files = sorted(dpath.glob("*.tar"))
+    print(f"Directory     : {dpath}")
+    print(f"Shard count   : {len(tar_files)}")
+
     if not tar_files:
-        print(f"[ERROR] No .tar files found in: {data_dir}")
-        sys.exit(1)
-
-    print(f"LAION-Art Dataset Verification")
-    print(f"{'=' * 50}")
-    print(f"Directory : {data_dir}")
-    print(f"Tar shards: {len(tar_files)}")
-    print()
+        print("[WARN] No .tar shards found.")
+        return
 
     total_images = 0
-    total_texts = 0
-    total_size_mb = 0
-    errors = []
+    total_captions = 0
+    total_json = 0
+    corrupted_shards = []
+    corrupt_images = []
+    total_bytes = 0
 
-    for i, tf in enumerate(tar_files):
-        result = count_shard_images(tf)
-        total_images += result["images"]
-        total_texts += result["texts"]
-        total_size_mb += result["size_mb"]
+    for tf_path in tar_files:
+        total_bytes += tf_path.stat().st_size
+        try:
+            with tarfile.open(str(tf_path), "r") as tf:
+                members = tf.getmembers()
+                jpgs = [m for m in members if m.name.endswith(".jpg")]
+                txts = [m for m in members if m.name.endswith(".txt")]
+                jsons = [m for m in members if m.name.endswith(".json")]
 
-        if result["error"]:
-            errors.append(result)
+                total_images += len(jpgs)
+                total_captions += len(txts)
+                total_json += len(jsons)
 
-        if args.detailed:
-            status = "ERR" if result["error"] else "OK"
-            print(f"  [{status}] {os.path.basename(tf)}: "
-                  f"{result['images']:,} images, "
-                  f"{result['size_mb']:.1f} MB"
-                  f"{' -- ' + result['error'] if result['error'] else ''}")
+                if check_images:
+                    from PIL import Image
+                    import io
+                    for m in jpgs:
+                        try:
+                            f = tf.extractfile(m)
+                            Image.open(io.BytesIO(f.read())).verify()
+                        except Exception:
+                            corrupt_images.append(f"{tf_path.name}/{m.name}")
 
-        if (i + 1) % 50 == 0:
-            print(f"  ... checked {i + 1}/{len(tar_files)} shards "
-                  f"({total_images:,} images so far)")
+        except Exception as e:
+            corrupted_shards.append((tf_path.name, str(e)))
 
-    print()
-    print(f"Results")
-    print(f"{'-' * 50}")
-    print(f"Total shards     : {len(tar_files)}")
-    print(f"Total images     : {total_images:,}")
-    print(f"Total captions   : {total_texts:,}")
-    print(f"Total size       : {total_size_mb / 1024:.1f} GB")
-    print(f"Avg images/shard : {total_images // max(len(tar_files), 1):,}")
-    print(f"Corrupted shards : {len(errors)}")
+    size_gb = total_bytes / (1024 ** 3)
 
-    coverage = total_images / EXPECTED_TOTAL_IMAGES * 100
-    print()
-    print(f"Coverage")
-    print(f"{'-' * 50}")
-    print(f"Expected (ideal) : {EXPECTED_TOTAL_IMAGES:,}")
-    print(f"Actual           : {total_images:,} ({coverage:.1f}%)")
+    print(f"Total size    : {size_gb:.2f} GB")
+    print(f"Total images  : {total_images:,}")
+    print(f"Total captions: {total_captions:,}")
+    print(f"Total metadata: {total_json:,}")
 
-    if coverage >= 60:
-        print(f"[OK] Dataset has sufficient coverage for pre-training.")
-    elif coverage >= 30:
-        print(f"[WARN] Dataset coverage is low. Pre-training may be weaker.")
-        print(f"       Consider resubmitting the download job.")
+    if total_images > 0 and len(tar_files) > 0:
+        print(f"Avg per shard : {total_images // len(tar_files):,}")
+
+    if corrupted_shards:
+        print(f"\n[ERROR] Corrupted shards ({len(corrupted_shards)}):")
+        for name, err in corrupted_shards:
+            print(f"  {name}: {err}")
     else:
-        print(f"[ERROR] Dataset coverage is too low. Resubmit download_laion_art.sh.")
+        print(f"\nAll {len(tar_files)} shards OK.")
 
-    if errors:
-        print()
-        print(f"Corrupted Shards ({len(errors)})")
-        print(f"{'-' * 50}")
-        for e in errors:
-            print(f"  {os.path.basename(e['path'])}: {e['error']}")
-        print(f"  Consider deleting these and rerunning the download script.")
+    if check_images:
+        if corrupt_images:
+            print(f"\n[WARN] Corrupt images ({len(corrupt_images)}):")
+            for ci in corrupt_images[:20]:
+                print(f"  {ci}")
+            if len(corrupt_images) > 20:
+                print(f"  ... and {len(corrupt_images) - 20} more")
+        else:
+            print(f"All {total_images:,} images verified OK.")
 
-    if args.show_samples > 0:
-        print()
-        print(f"Sample Entries (from first shard)")
-        print(f"{'-' * 50}")
-        show_samples(tar_files[0], args.show_samples)
-
-    print()
+    # Check state file
+    state_file = dpath / ".download_state.json"
+    if state_file.exists():
+        with open(state_file) as f:
+            state = json.load(f)
+        print(f"\nDownload state:")
+        print(f"  Completed rows : {state.get('completed_rows', '?'):,}")
+        print(f"  Successful     : {state.get('successful_downloads', '?'):,}")
+        print(f"  Failed         : {state.get('failed_downloads', '?'):,}")
+        sr = state.get("successful_downloads", 0) / max(state.get("completed_rows", 1), 1) * 100
+        print(f"  Success rate   : {sr:.1f}%")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Verify LAION-Art WebDataset")
+    parser.add_argument("--data-dir", type=str,
+        default="/cluster/tufts/c26sp1ee0141/pliu07/LAION_ART/webdataset")
+    parser.add_argument("--check-images", action="store_true",
+        help="Also verify each image is decodable (slower)")
+    verify(parser.parse_args().data_dir, parser.parse_args().check_images)
