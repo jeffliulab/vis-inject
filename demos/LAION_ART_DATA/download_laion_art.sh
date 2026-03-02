@@ -92,7 +92,8 @@ case "${MODE}" in
         echo "[INFO] Resumable. If it times out: sbatch download_laion_art.sh resume"
         srun -n 1 -c ${SLURM_CPUS_PER_TASK:-16} \
             ${PYTHON} "${DOWNLOADER}" \
-                --workers 32 \
+                --workers 64 \
+                --timeout 5 \
                 --output-dir "${DATA_DIR}/webdataset" \
                 --log-dir "${LOG_DIR}"
         ;;
@@ -102,7 +103,8 @@ case "${MODE}" in
         srun -n 1 -c ${SLURM_CPUS_PER_TASK:-16} \
             ${PYTHON} "${DOWNLOADER}" \
                 --resume \
-                --workers 32 \
+                --workers 64 \
+                --timeout 5 \
                 --output-dir "${DATA_DIR}/webdataset" \
                 --log-dir "${LOG_DIR}"
         ;;

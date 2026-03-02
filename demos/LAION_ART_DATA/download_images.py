@@ -228,8 +228,8 @@ def classify_error(e: Exception) -> str:
     return "unknown"
 
 
-def download_single_image(url: str, timeout: int = 15,
-                          max_retries: int = 2) -> Tuple[Optional[bytes], str]:
+def download_single_image(url: str, timeout: int = 5,
+                          max_retries: int = 1) -> Tuple[Optional[bytes], str]:
     """Returns (image_bytes, error_category). error_category is "" on success."""
     headers = {"User-Agent": "Mozilla/5.0 (compatible; LAION-Downloader/2.0)"}
 
@@ -250,8 +250,11 @@ def download_single_image(url: str, timeout: int = 15,
         except (URLError, HTTPError, TimeoutError, OSError,
                 ConnectionError, ValueError) as e:
             last_err = classify_error(e)
+            if last_err in ("http_404", "http_403", "dns_failure",
+                            "connection_refused", "invalid_url"):
+                return None, last_err
             if attempt < max_retries:
-                time.sleep(0.5 * (2 ** attempt))
+                time.sleep(0.3)
         except Exception:
             return None, "unknown"
     return None, last_err
@@ -608,7 +611,7 @@ def main(args):
     logger.info("")
 
     t0 = time.time()
-    batch_size = args.workers * 4
+    batch_size = args.workers * 8
     global_idx = skip
     batches_done = 0
     last_snapshot = t0
@@ -657,7 +660,7 @@ def main(args):
         global_idx += len(batch)
         batches_done += 1
 
-        if batches_done % 10 == 0 or batch_start + batch_size >= total:
+        if batches_done % 3 == 0 or batch_start + batch_size >= total:
             logger.info(tracker.format_progress(total + skip))
 
         now = time.time()
@@ -744,9 +747,9 @@ if __name__ == "__main__":
     parser.add_argument("--image-size", type=int, default=224)
     parser.add_argument("--encode-quality", type=int, default=95)
 
-    parser.add_argument("--workers", type=int, default=32,
+    parser.add_argument("--workers", type=int, default=64,
         help="Parallel download threads")
-    parser.add_argument("--timeout", type=int, default=15,
+    parser.add_argument("--timeout", type=int, default=5,
         help="Per-image download timeout (seconds)")
     parser.add_argument("--shard-size", type=int, default=10000,
         help="Images per WebDataset .tar shard")
