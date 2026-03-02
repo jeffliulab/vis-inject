@@ -47,11 +47,25 @@ REGISTRY: dict = {
         "short_name": "Qwen2.5-VL-3B",
         "family":     "qwen",
         "dtype":      "bf16",
-        "img_size":   392,          # 视觉编码器期望输入尺寸（正方形边长）
+        "img_size":   392,
         "norm_mean":  [0.48145466, 0.4578275,  0.40821073],
         "norm_std":   [0.26862954, 0.26130258, 0.27577711],
-        "vram_bf16_gb":         6.0,   # 完整模型显存估计
-        "encoder_vram_bf16_gb": 0.6,   # 仅视觉编码器
+        "vram_bf16_gb":         6.0,
+        "encoder_vram_bf16_gb": 0.6,
+        "used_by":    ["demo3", "demo_S1", "demo_S2_eval", "demo_S3"],
+    },
+
+    "qwen2_vl_2b": {
+        "hf_id":      "Qwen/Qwen2-VL-2B-Instruct",
+        "short_name": "Qwen2-VL-2B",
+        "family":     "qwen",
+        "dtype":      "bf16",
+        "img_size":   392,
+        "norm_mean":  [0.48145466, 0.4578275,  0.40821073],
+        "norm_std":   [0.26862954, 0.26130258, 0.27577711],
+        "vram_bf16_gb":         4.0,
+        "encoder_vram_bf16_gb": 0.6,
+        "used_by":    ["demo_S3"],  # Universal Attack 原论文目标模型
     },
 
     "qwen2_5_vl_7b": {
@@ -64,6 +78,7 @@ REGISTRY: dict = {
         "norm_std":   [0.26862954, 0.26130258, 0.27577711],
         "vram_bf16_gb":         14.0,
         "encoder_vram_bf16_gb": 0.6,
+        "used_by":    ["demo_S1"],
     },
 
     # ── BLIP-2 系列 ────────────────────────────────────────────────
@@ -77,6 +92,7 @@ REGISTRY: dict = {
         "norm_std":   [0.26862954, 0.26130258, 0.27577711],
         "vram_bf16_gb":         5.4,
         "encoder_vram_bf16_gb": 2.0,
+        "used_by":    ["demo1", "demo_S1", "demo_S2_eval"],
     },
 
     "blip2_flan_t5_xl": {
@@ -89,6 +105,20 @@ REGISTRY: dict = {
         "norm_std":   [0.26862954, 0.26130258, 0.27577711],
         "vram_bf16_gb":         8.0,
         "encoder_vram_bf16_gb": 2.0,
+        "used_by":    ["demo_S2_eval"],
+    },
+
+    "instructblip_vicuna_7b": {
+        "hf_id":      "Salesforce/instructblip-vicuna-7b",
+        "short_name": "InstructBLIP-Vicuna-7B",
+        "family":     "blip2",
+        "dtype":      "fp16",
+        "img_size":   224,
+        "norm_mean":  [0.48145466, 0.4578275,  0.40821073],
+        "norm_std":   [0.26862954, 0.26130258, 0.27577711],
+        "vram_bf16_gb":         14.0,
+        "encoder_vram_bf16_gb": 2.0,
+        "used_by":    ["demo_S2_eval"],  # AnyAttack 原论文评估目标
     },
 
     # ── DeepSeek 系列 ──────────────────────────────────────────────
@@ -102,6 +132,7 @@ REGISTRY: dict = {
         "norm_std":   [0.5, 0.5, 0.5],
         "vram_bf16_gb":         3.8,
         "encoder_vram_bf16_gb": 1.0,
+        "used_by":    ["demo2", "demo_S1"],
     },
 
     "deepseek_vl2_tiny": {
@@ -114,9 +145,10 @@ REGISTRY: dict = {
         "norm_std":   [0.5, 0.5, 0.5],
         "vram_bf16_gb":         3.0,
         "encoder_vram_bf16_gb": 0.8,
+        "used_by":    ["demo_S1"],
     },
 
-    # ── CLIP 系列（纯视觉编码器，用于 demo_S1 编码器集成）────────────
+    # ── CLIP 系列（纯视觉编码器）──────────────────────────────────
     "clip_vit_l14": {
         "hf_id":      "openai/clip-vit-large-patch14",
         "short_name": "CLIP-ViT-L/14",
@@ -127,6 +159,7 @@ REGISTRY: dict = {
         "norm_std":   [0.26862954, 0.26130258, 0.27577711],
         "vram_bf16_gb":         0.9,
         "encoder_vram_bf16_gb": 0.9,
+        "used_by":    ["demo_S1", "demo_C1"],
     },
 
     "clip_vit_b32": {
@@ -139,22 +172,66 @@ REGISTRY: dict = {
         "norm_std":   [0.26862954, 0.26130258, 0.27577711],
         "vram_bf16_gb":         0.3,
         "encoder_vram_bf16_gb": 0.3,
+        "used_by":    ["demo_S2"],  # AnyAttack surrogate encoder
     },
 
-    # ── LLaVA 系列（扩展示例，取消注释后创建对应 encoder/vlm 文件即可）
-    # "llava_1_5_7b": {
-    #     "hf_id":      "llava-hf/llava-1.5-7b-hf",
-    #     "short_name": "LLaVA-1.5-7B",
-    #     "family":     "llava",
-    #     "dtype":      "fp16",
-    #     "img_size":   336,
-    #     "norm_mean":  [0.48145466, 0.4578275, 0.40821073],
-    #     "norm_std":   [0.26862954, 0.26130258, 0.27577711],
-    #     "vram_bf16_gb":         14.0,
-    #     "encoder_vram_bf16_gb": 0.9,
-    # },
+    # ── LLaVA 系列 ────────────────────────────────────────────────
+    "llava_1_5_7b": {
+        "hf_id":      "llava-hf/llava-1.5-7b-hf",
+        "short_name": "LLaVA-1.5-7B",
+        "family":     "llava",
+        "dtype":      "fp16",
+        "img_size":   336,
+        "norm_mean":  [0.48145466, 0.4578275,  0.40821073],
+        "norm_std":   [0.26862954, 0.26130258, 0.27577711],
+        "vram_bf16_gb":         14.0,
+        "encoder_vram_bf16_gb": 0.9,
+        "used_by":    ["demo_S3"],  # Universal Attack 原论文目标模型
+    },
 
-    # ── InternVL 系列
+    # ── Llama Vision 系列 ─────────────────────────────────────────
+    "llama_3_2_11b_vision": {
+        "hf_id":      "meta-llama/Llama-3.2-11B-Vision-Instruct",
+        "short_name": "Llama-3.2-11B-Vision",
+        "family":     "llama",
+        "dtype":      "bf16",
+        "img_size":   560,
+        "norm_mean":  [0.48145466, 0.4578275,  0.40821073],
+        "norm_std":   [0.26862954, 0.26130258, 0.27577711],
+        "vram_bf16_gb":         22.0,
+        "encoder_vram_bf16_gb": 1.2,
+        "used_by":    ["demo_S3"],  # Universal Attack 原论文目标模型
+    },
+
+    # ── Phi Vision 系列 ───────────────────────────────────────────
+    "phi_3_5_vision": {
+        "hf_id":      "microsoft/Phi-3.5-vision-instruct",
+        "short_name": "Phi-3.5-Vision",
+        "family":     "phi",
+        "dtype":      "bf16",
+        "img_size":   336,
+        "norm_mean":  [0.48145466, 0.4578275,  0.40821073],
+        "norm_std":   [0.26862954, 0.26130258, 0.27577711],
+        "vram_bf16_gb":         8.0,
+        "encoder_vram_bf16_gb": 0.9,
+        "used_by":    ["demo_S3"],  # Universal Attack 原论文目标模型
+    },
+
+    # ── MiniGPT-4 系列 ────────────────────────────────────────────
+    "minigpt4_vicuna_7b": {
+        "hf_id":      "Vision-CAIR/MiniGPT-4",
+        "short_name": "MiniGPT-4-Vicuna-7B",
+        "family":     "minigpt4",
+        "dtype":      "fp16",
+        "img_size":   224,
+        "norm_mean":  [0.48145466, 0.4578275,  0.40821073],
+        "norm_std":   [0.26862954, 0.26130258, 0.27577711],
+        "vram_bf16_gb":         14.0,
+        "encoder_vram_bf16_gb": 2.0,
+        "used_by":    ["demo_S2_eval"],  # AnyAttack 原论文评估目标
+    },
+
+    # ── InternVL 系列（扩展预留）──────────────────────────────────
     # "internvl2_2b": {
     #     "hf_id":      "OpenGVLab/InternVL2-2B",
     #     "short_name": "InternVL2-2B",

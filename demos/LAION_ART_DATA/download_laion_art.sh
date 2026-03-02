@@ -18,18 +18,16 @@ set -euo pipefail
 ############################
 ENV_DIR="/cluster/tufts/c26sp1ee0141/pliu07/condaenv/visinject"
 PYTHON="${ENV_DIR}/bin/python"
-PIP="${ENV_DIR}/bin/pip"
 
 DATA_DIR="/cluster/tufts/c26sp1ee0141/pliu07/LAION_ART"
-PARQUET_DIR="${DATA_DIR}/metadata"
-OUTPUT_DIR="${DATA_DIR}/webdataset"
 LOG_DIR="${DATA_DIR}/logs"
 
-PARQUET_URL="https://huggingface.co/datasets/laion/laion-art/resolve/main/laion-art.parquet"
+# Script location (adjust if you copy files to HPC separately)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOWNLOADER="${SCRIPT_DIR}/download_images.py"
 
-IMAGE_SIZE=224
-PROCESSES=16
-THREADS=64
+# Select mode: test | full | resume
+MODE="${1:-full}"
 
 ############################
 # Modules
@@ -38,20 +36,15 @@ module load class || true
 module load ee110/2025fall-1 || true
 
 ############################
-# Directory setup
+# Setup
 ############################
-mkdir -p "${PARQUET_DIR}" "${OUTPUT_DIR}" "${LOG_DIR}"
+mkdir -p "${LOG_DIR}"
 
-############################
-# Environment check
-############################
 echo "===== LAION-Art Download Job ====="
-echo "JobID     : ${SLURM_JOB_ID:-local}"
-echo "Node      : ${SLURM_NODELIST:-$(hostname)}"
-echo "DATA_DIR  : ${DATA_DIR}"
-echo "IMAGE_SIZE: ${IMAGE_SIZE}"
-echo "PROCESSES : ${PROCESSES}"
-echo "THREADS   : ${THREADS}"
+echo "JobID  : ${SLURM_JOB_ID:-local}"
+echo "Node   : ${SLURM_NODELIST:-$(hostname)}"
+echo "Mode   : ${MODE}"
+echo "Script : ${DOWNLOADER}"
 echo "=================================="
 
 if [ ! -x "${PYTHON}" ]; then
@@ -60,107 +53,65 @@ if [ ! -x "${PYTHON}" ]; then
 fi
 ${PYTHON} -V
 
-############################
-# Step 1: Install img2dataset if missing
-############################
-if ! ${PYTHON} -c "import img2dataset" 2>/dev/null; then
-    echo "[INFO] Installing img2dataset..."
-    ${PIP} install img2dataset --quiet
-fi
-echo "[OK] img2dataset version: $(${PYTHON} -c 'import img2dataset; print(img2dataset.__version__)')"
+# Check required Python packages (all standard or commonly available)
+echo "[INFO] Checking dependencies..."
+${PYTHON} -c "import pyarrow; print(f'  pyarrow {pyarrow.__version__}')" || {
+    echo "[WARN] pyarrow not found. Installing..."
+    ${ENV_DIR}/bin/pip install pyarrow --quiet
+}
+${PYTHON} -c "from PIL import Image; import PIL; print(f'  Pillow {PIL.__version__}')" || {
+    echo "[WARN] Pillow not found. Installing..."
+    ${ENV_DIR}/bin/pip install Pillow --quiet
+}
+echo "[OK] Dependencies ready."
 
 ############################
-# Step 2: Download parquet metadata
+# Run
 ############################
-PARQUET_FILE="${PARQUET_DIR}/laion-art.parquet"
+case "${MODE}" in
+    test)
+        echo ""
+        echo "[MODE] Test run: downloading 100 images to verify setup"
+        srun -n 1 -c ${SLURM_CPUS_PER_TASK:-16} \
+            ${PYTHON} "${DOWNLOADER}" \
+                --test-run \
+                --test-count 100 \
+                --workers 8 \
+                --output-dir "${DATA_DIR}/webdataset_test"
+        echo ""
+        echo "[INFO] Test images saved to: ${DATA_DIR}/webdataset_test"
+        echo "[INFO] If this worked, run: sbatch download_laion_art.sh full"
+        ;;
+    full)
+        echo ""
+        echo "[MODE] Full download: ~8M images"
+        echo "[INFO] This is resumable. Resubmit if it times out:"
+        echo "       sbatch download_laion_art.sh resume"
+        echo ""
+        srun -n 1 -c ${SLURM_CPUS_PER_TASK:-16} \
+            ${PYTHON} "${DOWNLOADER}" \
+                --workers 32 \
+                --output-dir "${DATA_DIR}/webdataset"
+        ;;
+    resume)
+        echo ""
+        echo "[MODE] Resuming interrupted download"
+        srun -n 1 -c ${SLURM_CPUS_PER_TASK:-16} \
+            ${PYTHON} "${DOWNLOADER}" \
+                --resume \
+                --workers 32 \
+                --output-dir "${DATA_DIR}/webdataset"
+        ;;
+    *)
+        echo "[ERROR] Unknown mode: ${MODE}"
+        echo ""
+        echo "Usage:"
+        echo "  sbatch download_laion_art.sh test     # Test with 100 images first"
+        echo "  sbatch download_laion_art.sh full     # Full download (~8M images)"
+        echo "  sbatch download_laion_art.sh resume   # Resume interrupted download"
+        exit 1
+        ;;
+esac
 
-if [ -f "${PARQUET_FILE}" ]; then
-    FILE_SIZE=$(stat -c%s "${PARQUET_FILE}" 2>/dev/null || stat -f%z "${PARQUET_FILE}" 2>/dev/null || echo "0")
-    if [ "${FILE_SIZE}" -gt 100000000 ]; then
-        echo "[OK] Parquet metadata already exists ($(numfmt --to=iec ${FILE_SIZE})). Skipping download."
-    else
-        echo "[WARN] Parquet file too small (${FILE_SIZE} bytes). Re-downloading..."
-        rm -f "${PARQUET_FILE}"
-    fi
-fi
-
-if [ ! -f "${PARQUET_FILE}" ]; then
-    echo "[INFO] Downloading LAION-Art parquet metadata..."
-    wget -q --show-progress -O "${PARQUET_FILE}" "${PARQUET_URL}"
-    echo "[OK] Parquet download complete."
-fi
-
-############################
-# Step 3: Show dataset stats
-############################
-echo "[INFO] Dataset statistics:"
-${PYTHON} -c "
-import pyarrow.parquet as pq
-table = pq.read_table('${PARQUET_FILE}')
-print(f'  Total rows   : {table.num_rows:,}')
-print(f'  Columns      : {table.column_names}')
-print(f'  File size    : {table.nbytes / 1e9:.2f} GB (in-memory)')
-"
-
-############################
-# Step 4: Download images via img2dataset
-#
-# img2dataset is RESUMABLE by design:
-#   - It tracks completed shards in the output directory
-#   - Rerunning the same command skips already-downloaded shards
-#   - Safe to resubmit this script if the job times out
-############################
-echo "[INFO] Starting img2dataset download..."
-echo "[INFO] This is resumable. Resubmit this script if it times out."
-echo "[INFO] Target: ${OUTPUT_DIR}"
-
-${PYTHON} -m img2dataset \
-    --url_list "${PARQUET_FILE}" \
-    --input_format "parquet" \
-    --url_col "URL" \
-    --caption_col "TEXT" \
-    --output_format "webdataset" \
-    --output_folder "${OUTPUT_DIR}" \
-    --image_size ${IMAGE_SIZE} \
-    --resize_mode "center_crop" \
-    --resize_only_if_bigger True \
-    --processes_count ${PROCESSES} \
-    --thread_count ${THREADS} \
-    --save_additional_columns '["similarity","hash","punsafe","pwatermark","aesthetic","LANGUAGE"]' \
-    --number_sample_per_shard 10000 \
-    --encode_format "jpg" \
-    --encode_quality 95 \
-    --retries 3 \
-    --timeout 30 \
-    --disallowed_header_directives '[]'
-
-############################
-# Step 5: Post-download summary
-############################
 echo ""
-echo "===== Download Summary ====="
-SHARD_COUNT=$(find "${OUTPUT_DIR}" -name "*.tar" 2>/dev/null | wc -l)
-TOTAL_SIZE=$(du -sh "${OUTPUT_DIR}" 2>/dev/null | cut -f1)
-echo "  Shards downloaded : ${SHARD_COUNT}"
-echo "  Total size        : ${TOTAL_SIZE}"
-
-${PYTHON} -c "
-import glob, tarfile, os
-
-tar_files = sorted(glob.glob('${OUTPUT_DIR}/*.tar'))
-if not tar_files:
-    print('  No tar files found yet.')
-else:
-    total_images = 0
-    for tf in tar_files:
-        try:
-            with tarfile.open(tf, 'r') as t:
-                jpg_count = sum(1 for m in t.getmembers() if m.name.endswith('.jpg'))
-                total_images += jpg_count
-        except Exception:
-            pass
-    print(f'  Total images      : {total_images:,}')
-    print(f'  Avg per shard     : {total_images // max(len(tar_files), 1):,}')
-"
-echo "============================="
-echo "[DONE] LAION-Art download job finished at $(date)"
+echo "[DONE] Download job finished at $(date)"

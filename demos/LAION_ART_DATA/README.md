@@ -20,14 +20,34 @@ This dataset is used for self-supervised pre-training of the AnyAttack Decoder n
 
 ## Download Instructions
 
-### Step 1: Submit the download job
+### Step 1: Test the setup (recommended)
 
 ```bash
-# On the HPC login node:
-sbatch download_laion_art.sh
+# Test with 100 images first to verify network access and dependencies
+sbatch download_laion_art.sh test
 ```
 
-### Step 2: Monitor progress
+This downloads 100 images to `webdataset_test/` and takes about 1 minute.
+Check the SLURM log to verify it worked before starting the full download.
+
+### Step 2: Start full download
+
+```bash
+sbatch download_laion_art.sh full
+```
+
+### Step 3: If the job times out, resume
+
+The downloader tracks progress in a `.download_state.json` file and supports
+full resume. Simply resubmit:
+
+```bash
+sbatch download_laion_art.sh resume
+```
+
+Repeat until the download completes.
+
+### Step 4: Monitor progress
 
 ```bash
 # Check job status
@@ -37,26 +57,22 @@ squeue -u $USER
 tail -f /cluster/tufts/c26sp1ee0141/pliu07/LAION_ART/logs/download_<JOBID>.out
 ```
 
-### Step 3: If the job times out, resubmit
-
-`img2dataset` is **resumable by design** -- it tracks completed shards and skips them
-on rerun. Simply resubmit the same script:
-
-```bash
-sbatch download_laion_art.sh
-```
-
-Repeat until the download completes. You can verify completeness with:
-
-```bash
-python verify_dataset.py
-```
-
-### Step 4: Verify the dataset
+### Step 5: Verify the dataset
 
 ```bash
 python verify_dataset.py --data-dir /cluster/tufts/c26sp1ee0141/pliu07/LAION_ART/webdataset
 ```
+
+## Dependencies
+
+The downloader (`download_images.py`) uses **only standard/common libraries**
+-- no `img2dataset` needed:
+
+- `pyarrow` -- parquet file reading
+- `Pillow` -- image resize/crop
+- Python stdlib: `urllib`, `concurrent.futures`, `tarfile`, `json`
+
+Both `pyarrow` and `Pillow` are auto-installed by the SLURM script if missing.
 
 ## Output Structure
 
@@ -106,12 +122,25 @@ A: This is expected. LAION datasets are crawled from the web and URLs expire ove
 Typically 20-40% of URLs are dead. img2dataset handles this gracefully and logs failures.
 You should still get 5-6 million usable images, which is sufficient for pre-training.
 
+**Q: img2dataset installation fails?**
+A: The new `download_images.py` does not use img2dataset at all. It only needs
+`pyarrow` and `Pillow`, which are much easier to install. The SLURM script
+auto-installs them if missing.
+
 **Q: The download is very slow?**
-A: Ensure the HPC compute nodes have internet access. If only login nodes can reach
-the internet, you may need to run the download interactively on a login node (use `screen`
-or `tmux` to prevent session termination). Adjust `--processes_count` and `--thread_count`
-based on your network bandwidth.
+A: Adjust `--workers` (default 32). On a slow network, try `--workers 8`.
+If only login nodes can reach the internet, run interactively with `screen` or `tmux`:
+```bash
+screen -S download
+python download_images.py --workers 16 --resume
+```
 
 **Q: "Permission denied" or "Disk quota exceeded"?**
 A: Check your storage quota with `quota -s` or equivalent. LAION-Art needs 80-150 GB.
 Consider using `$SCRATCH` if your home directory quota is limited.
+
+**Q: How do I download only a subset?**
+A: Use `--start-shard` and `--end-shard` to download a range:
+```bash
+python download_images.py --start-shard 0 --end-shard 10  # first 100K images
+```
