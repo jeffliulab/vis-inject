@@ -333,6 +333,27 @@ class ShardWriter:
         if self.current_tar is not None:
             self.current_tar.close()
         path = self.output_dir / f"{shard_id:05d}.tar"
+
+        # Resume protection: skip shards that are already complete.
+        # Without this, tarfile.open(path, "w") would truncate existing
+        # shards, destroying all previously downloaded images in that shard.
+        if path.exists() and path.stat().st_size > 1_000_000:
+            try:
+                with tarfile.open(str(path), "r") as existing:
+                    member_count = len(existing.getmembers())
+                expected = self.shard_size * 3  # jpg + txt + json per image
+                if member_count >= expected * 0.9:
+                    logging.getLogger("laion_downloader").info(
+                        f"Shard {shard_id:05d} already complete "
+                        f"({member_count} members), skipping"
+                    )
+                    self.current_tar = None
+                    self.current_shard_id = shard_id
+                    self.current_count = self.shard_size
+                    return
+            except tarfile.TarError:
+                pass  # corrupted shard, overwrite it
+
         self.current_tar = tarfile.open(str(path), "w")
         self.current_shard_id = shard_id
         self.current_count = 0
@@ -347,6 +368,10 @@ class ShardWriter:
         target_shard = global_idx // self.shard_size
         if self.current_tar is None or target_shard != self.current_shard_id:
             self._open_shard(target_shard)
+
+        # Skip writes for already-complete shards
+        if self.current_tar is None:
+            return
 
         prefix = f"{global_idx:09d}"
         self._add_bytes(f"{prefix}.jpg", sample["image_bytes"])
@@ -546,7 +571,7 @@ def main(args):
     signal.signal(signal.SIGINT, _sig_handler)
 
     logger.info("=" * 60)
-    logger.info("LAION-Art Image Downloader v2")
+    logger.info("LAION-Art Image Downloader v2.1")
     logger.info("=" * 60)
 
     log_system_info(logger, args.output_dir)

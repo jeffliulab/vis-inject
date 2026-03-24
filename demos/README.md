@@ -2,29 +2,31 @@
 
 This directory contains all experimental demos for the VisInject project, progressing from basic single-model PGD attacks to advanced generative adversarial approaches.
 
-## Quick Navigation
+> **Chinese version**: [README_CN.md](README_CN.md)
 
-| Demo | Target Model | Method | Status |
-|------|-------------|--------|--------|
-| [Demo_0](#demo_0-clip-cross-modal-embedding-attack) | CLIP ViT-L/14 | Embedding alignment via PGD | Completed |
-| [Demo1](#demo1-blip-2-end-to-end-pgd) | BLIP-2 (OPT-2.7B) | End-to-end CE + PGD | Completed |
-| [Demo2](#demo2-deepseek-vl-pgd) | DeepSeek-VL 1.3B | End-to-end CE + PGD | Completed |
-| [Demo3](#demo3-qwen25-vl-pgd) | Qwen2.5-VL-3B | End-to-end CE + PGD | Completed |
-| [Demo_S1](#demo_s1-stegoencoder) | Multi-VLM | U-Net generative encoder | Abandoned |
-| [Demo_S2](#demo_s2-anyattack) | Cross-model (CLIP proxy) | Self-supervised Decoder | In Progress |
-| [Demo_S2P](#demo_s2p-anyattack-official-weights) | Cross-model (CLIP proxy) | Official pre-trained Decoder | Ready |
-| [Demo_S3](#demo_s3-universalattack) | Qwen / multi-model | Direct pixel optimization | Code Complete |
+## Quick Summary
+
+| Demo | Method | Key Result | Conclusion |
+|------|--------|------------|------------|
+| [demo_0](#demo_0-clip-cross-modal-embedding-attack) | CLIP embedding PGD | Sim 0.126→0.68, PSNR 22-27dB | Works within CLIP, **no transfer** |
+| [demo1](#demo1-blip-2-end-to-end-pgd) | BLIP-2 E2E PGD | CE 10.7→0.0, ASR 100% | Single-model success |
+| [demo2](#demo2-deepseek-vl-pgd) | DeepSeek-VL E2E PGD | Same pattern, SigLIP+LLaMA | PGD generalizes across architectures |
+| [demo3](#demo3-qwen25-vl-pgd) | Qwen2.5-VL E2E PGD | Loss 10.74→0.00 in ~50 steps | Fastest convergence, cleanest impl |
+| [demo_S1](#demo_s1-stegoencoder) | StegoEncoder (DCT U-Net) | Loss 10.70→10.12, ASR 0% | **Abandoned** — too slow |
+| [demo_S2](#demo_s2-anyattack_laionart) | AnyAttack self-train (CVPR'25) | Code complete, data ~12% | Awaiting LAION-Art data |
+| [demo_S2P](#demo_s2p-anyattack_laion400m) | AnyAttack official weights | coco_bi.pt ready | Used in final VisInject |
+| [demo_S3](#demo_s3-universalattack) | Universal pixel optimization | Paper ASR: 15-81% | Used in final VisInject |
 
 ## Research Progression
 
 ```
 Stage 1: Single-Model PGD            Stage 2: Generative           Stage 3: Final
-┌──────────────────────┐     ┌──────────────────────────┐     ┌──────────────┐
-│ Demo_0  CLIP ViT     │     │ Demo_S1  StegoEncoder    │     │              │
-│ Demo1   BLIP-2       │ ──> │ Demo_S2  AnyAttack       │ ──> │  VisInject   │
-│ Demo2   DeepSeek-VL  │     │ Demo_S3  UniversalAttack │     │  S3 + S2     │
-│ Demo3   Qwen2.5-VL   │     └──────────────────────────┘     └──────────────┘
-└──────────────────────┘
+┌──────────────────────┐     ┌──────────────────────────┐     ┌──────────────────┐
+│ Demo_0  CLIP ViT     │     │ Demo_S1  StegoEncoder    │     │                  │
+│ Demo1   BLIP-2       │ ──> │ Demo_S2  AnyAttack       │ ──> │    VisInject     │
+│ Demo2   DeepSeek-VL  │     │ Demo_S3  UniversalAttack │     │ UniversalAttack  │
+│ Demo3   Qwen2.5-VL   │     └──────────────────────────┘     │ + AnyAttack      │
+└──────────────────────┘                                       └──────────────────┘
 ```
 
 ---
@@ -33,28 +35,24 @@ Stage 1: Single-Model PGD            Stage 2: Generative           Stage 3: Fina
 
 **Directory**: [`demo_0_CLIP_ViT/`](demo_0_CLIP_ViT/)
 
-Uses PGD to align a clean image's CLIP visual embedding with a target text's CLIP text embedding. Operates entirely in the CLIP ViT-L/14 shared embedding space.
+**Purpose**: Align a clean image's CLIP visual embedding with a target text's CLIP text embedding using PGD.
 
-**Key idea**: Minimize `1 - cos(E_v(x + delta), E_t(target_text))` under L-infinity constraint.
+**Method**: Minimize `1 - cos(E_v(x + delta), E_t(target_text))` under L-inf constraint. Operates entirely in CLIP ViT-L/14 shared embedding space.
 
-| Detail | Value |
-|--------|-------|
-| Vision encoder | CLIP ViT-L/14 |
-| Input size | 224 x 224 |
+| Parameter | Value |
+|-----------|-------|
+| Model | CLIP ViT-L/14 |
+| Input | 224 x 224 |
 | Perturbation | L-inf, eps = 16/255 |
 | VRAM | ~1.6 GB |
-| Steps | 500-1000 |
+| Steps | 500-1000, ~22s per attack |
 
-**Results**: CLIP similarity increased from 0.126 to 0.68. PSNR 22-27 dB, SSIM 0.50-0.73.
+**Results**:
+- CLIP similarity: **0.126 → 0.68**
+- PSNR: 22-27 dB
+- SSIM: 0.50-0.73
 
-**Key finding**: Cross-modal alignment works within CLIP, but does **not** transfer to other VLMs (BLIP-2, DeepSeek, Qwen) since they use different vision encoders (EVA-CLIP, SigLIP, etc.).
-
-### Usage
-
-```bash
-cd demo_0_CLIP_ViT
-python run_attack.py
-```
+**Conclusion**: Cross-modal alignment works within CLIP, but **does not transfer** to other VLMs (BLIP-2, DeepSeek, Qwen) because they use different vision encoders (EVA-CLIP, SigLIP, etc.). This motivated the end-to-end approach in subsequent demos.
 
 ---
 
@@ -62,31 +60,23 @@ python run_attack.py
 
 **Directory**: [`demo1_BLIP2/`](demo1_BLIP2/)
 
-First successful end-to-end VLM attack. Gradients flow from the cross-entropy loss through the entire BLIP-2 pipeline (OPT-2.7B -> Q-Former -> EVA-ViT-G) back to input pixels.
+**Purpose**: First successful end-to-end VLM attack. Gradients flow from cross-entropy loss through the entire BLIP-2 pipeline back to input pixels.
 
-```
-Image --> EVA-ViT-G --> Q-Former (32 queries) --> Linear Proj --> OPT-2.7B --> CE Loss --> PGD
-```
+**Architecture**: `Image → EVA-ViT-G → Q-Former (32 queries) → Linear Proj → OPT-2.7B → CE Loss → PGD`
 
-| Detail | Value |
-|--------|-------|
-| Vision encoder | EVA-ViT-G |
-| Bridge | Q-Former (32 learnable query tokens) |
-| LLM | OPT-2.7B |
-| Input size | 224 x 224 |
+| Parameter | Value |
+|-----------|-------|
+| Model | BLIP-2-OPT-2.7B (`Salesforce/blip2-opt-2.7b`) |
+| Input | 224 x 224 |
 | Perturbation | L-inf, eps = 32/255 |
 | VRAM | ~6 GB |
 
-**Results**: CE loss 10.7 -> ~0.0. 100% ASR on both direct tensor and PNG round-trip (with QAA).
+**Results**:
+- CE loss: **10.7 → ~0.0**
+- ASR: **100%** on both direct tensor and PNG round-trip (with QAA)
+- PSNR: ~32.5 dB
 
-### Usage
-
-```bash
-cd demo1_BLIP2
-python simple_demo.py                     # Quick attack
-python pgd_attack.py                      # Full attack with metrics
-python test_inference.py                  # Verify adversarial image
-```
+**Conclusion**: End-to-end PGD attack is highly effective on a single model. Manual embedding packing required for gradient flow through Q-Former.
 
 ---
 
@@ -94,30 +84,20 @@ python test_inference.py                  # Verify adversarial image
 
 **Directory**: [`demo2_DeepSeekVL_1/`](demo2_DeepSeekVL_1/)
 
-Extends the PGD attack methodology to DeepSeek-VL 1.3B, proving it generalizes across different VLM architectures (SigLIP vs EVA-CLIP, LLaMA vs OPT).
+**Purpose**: Verify that PGD attack generalizes to a different VLM architecture (SigLIP encoder + LLaMA backbone, vs EVA-CLIP + OPT in BLIP-2).
 
-```
-Image --> SigLIP-L (576 patches) --> MLP Aligner (1024->2048) --> LLaMA-1.3B --> CE Loss --> PGD
-```
+**Architecture**: `Image → SigLIP-L (576 patches) → MLP Aligner (1024→2048) → LLaMA-1.3B → CE Loss → PGD`
 
-| Detail | Value |
-|--------|-------|
-| Vision encoder | SigLIP-L |
-| Bridge | MLP Aligner (2-layer linear) |
-| LLM | LLaMA-1.3B (24 layers) |
-| Input size | 384 x 384 |
+| Parameter | Value |
+|-----------|-------|
+| Model | DeepSeek-VL-1.3B (`deepseek-ai/deepseek-vl-1.3b-chat`) |
+| Input | 384 x 384 |
 | Perturbation | L-inf, eps = 32/255 |
 | VRAM | ~5-8 GB |
 
-**Key technique**: Manual embedding concatenation to ensure full gradient flow through the model.
+**Results**: Successful attack. Hand-crafted embedding concatenation ensures full gradient flow through the model.
 
-### Usage
-
-```bash
-cd demo2_DeepSeekVL_1
-python simple_demo.py
-python pgd_attack.py
-```
+**Conclusion**: PGD attack pattern is **architecture-agnostic** — works across different vision encoders (EVA-CLIP vs SigLIP) and LLM backbones (OPT vs LLaMA). Requires `pip install deepseek-vl`.
 
 ---
 
@@ -125,30 +105,24 @@ python pgd_attack.py
 
 **Directory**: [`demo3_Qwen_2_5_VL_3B/`](demo3_Qwen_2_5_VL_3B/)
 
-Cleanest and fastest PGD attack implementation. Uses Qwen2.5-VL's native `model.forward(labels=...)` with differentiable `pixel_values`, avoiding manual embedding assembly.
+**Purpose**: Cleanest and fastest PGD attack implementation. Uses Qwen2.5-VL's native `model.forward(labels=...)` with differentiable `pixel_values`.
 
-```
-Image --> ViT-L (32 layers, 784 patches) --> PatchMerger (2x2, 196 tokens) --> Qwen2.5-3B --> CE Loss --> PGD
-```
+**Architecture**: `Image → ViT-L (32 layers, 784 patches) → PatchMerger (2x2, 196 tokens) → Qwen2.5-3B → CE Loss → PGD`
 
-| Detail | Value |
-|--------|-------|
-| Vision encoder | ViT-L (32 layers, d=1280) |
-| Bridge | PatchMerger (2x2 merge, 784 -> 196 tokens) |
-| LLM | Qwen2.5-3B (36 layers, mRoPE) |
-| Input size | 392 x 392 |
+| Parameter | Value |
+|-----------|-------|
+| Model | Qwen2.5-VL-3B-Instruct (`Qwen/Qwen2.5-VL-3B-Instruct`) |
+| Input | 392 x 392 |
 | Perturbation | L-inf, eps = 32/255 |
 | VRAM | ~12 GB |
 
-**Results**: CE loss 10.74 -> 0.00 in ~50 steps. 100% ASR with QAA. Fastest convergence among all demos.
+**Results**:
+- CE loss: **10.74 → 0.00** in ~50 steps
+- ASR: **100%** with QAA
+- Attack time: ~2-3 min per image
+- Fastest convergence among all demos
 
-### Usage
-
-```bash
-cd demo3_Qwen_2_5_VL_3B
-python simple_demo.py
-python pgd_attack.py
-```
+**Conclusion**: No manual embedding assembly needed — Qwen's native forward pass handles everything. Best developer experience for PGD attacks.
 
 ---
 
@@ -156,193 +130,114 @@ python pgd_attack.py
 
 **Directory**: [`demo_S1_Small_Model/`](demo_S1_Small_Model/) | **Status**: Abandoned
 
-First attempt at a generative (amortized) attack model. Trains a U-Net (~55M params) to produce adversarial perturbations conditioned on a target prompt, with DCT mid-frequency constraints to preserve image quality.
+**Purpose**: Train a lightweight U-Net (~55M params) to produce adversarial perturbations conditioned on a target prompt, with DCT mid-frequency constraints for cross-model transferability.
 
-```
-Clean Image + Prompt --> U-Net --> Raw Noise --> DCT Filter (bands 3-15) --> L-inf Norm --> Gaussian Blur --> Adversarial Image
-```
+**Architecture**: `Clean Image + Prompt → U-Net → Raw Noise → DCT Filter (bands 3-15) → L-inf Clamp → Adversarial Image`
 
-| Detail | Value |
-|--------|-------|
+**Key Innovation**: DCT mid-frequency domain (bands 3-15 of 8x8 blocks) as a universal cross-model channel. All vision encoders must process mid-frequencies, unlike high-frequency artifacts which are model-specific.
+
+| Parameter | Value |
+|-----------|-------|
 | Network | U-Net, 4 scales (64/128/256/512 ch), ~55M params |
-| Conditioning | Optional FiLM (text embedding modulates ResBlocks) |
-| Frequency constraint | 8x8 block DCT, mid-frequency bands 3-15 |
-| Target VLMs | BLIP-2, DeepSeek-VL, Qwen2.5-VL |
+| Target VLMs | BLIP-2, DeepSeek-VL, Qwen2.5-VL (simultaneously) |
+| Training | 1500 epochs, single image |
 
-**Results after 1500 epochs**: CE loss only dropped from 10.70 to ~10.12. ASR 0%. Estimated ~1400+ epochs per image to converge.
+**Results**:
+- CE loss: **10.70 → 10.12** after 1500 epochs
+- ASR: **0%**
+- Estimated convergence: ~1400+ epochs per single image
 
-**Why abandoned**: Training is orders of magnitude slower than direct PGD, and the DCT constraint severely limits attack capacity. Replaced by Demo_S2 (AnyAttack) and Demo_S3 (UniversalAttack), which use proven architectures from published papers.
-
-### File Structure
-
-```
-demo_S1_Small_Model/
-├── config.py                   # Global configuration
-├── models/stego_encoder.py     # U-Net with DCT constraints
-├── encoders/                   # VLM encoder wrappers (BLIP-2, DeepSeek, Qwen)
-├── prompts/                    # Prompt strategies (fixed keyword, style injection, etc.)
-├── vlms/                       # VLM inference wrappers
-├── training/                   # Trainers (proxy, e2e, RL)
-├── losses.py                   # Multi-component loss functions
-├── run_demo.py                 # Training entry point
-└── test/                       # Unit and integration tests
-```
+**Conclusion**: **Abandoned.** Training a generative model from scratch is orders of magnitude slower than direct PGD. The DCT constraint severely limits attack capacity. Replaced by Demo_S2 (AnyAttack) and Demo_S3 (UniversalAttack), which use proven architectures from published papers.
 
 ---
 
-## Demo_S2: AnyAttack
+## Demo_S2: AnyAttack_LAIONArt
 
-**Directory**: [`demo_S2_AnyAttack/`](demo_S2_AnyAttack/) | **Paper**: [CVPR 2025](https://arxiv.org/abs/2410.05346)
+**Directory**: [`demo_S2_AnyAttack/`](demo_S2_AnyAttack/) | **Paper**: [CVPR 2025](https://arxiv.org/abs/2410.05346) | **Status**: Awaiting Data
 
-Trains a Decoder network (~10M params) that takes a CLIP embedding and generates adversarial noise. The attack transfers across VLMs because it operates through the CLIP surrogate model rather than any specific target VLM.
+**Purpose**: Self-train the AnyAttack Decoder network on LAION-Art dataset for comparison with the official LAION-400M weights.
+
+**Architecture**: `Target Image → CLIP ViT-B/32 (frozen) → 512-dim → Decoder (~28M params) → Noise (224x224)`
 
 **Two-phase training**:
-1. **Self-supervised pre-training** on LAION-Art (~8M images) with InfoNCE contrastive loss and K-augmentation
-2. **Fine-tuning** on COCO with multi-encoder losses (CLIP + EVA + ViT-B/16) for cross-model transferability
+1. Self-supervised pre-training on LAION-Art (~8M images) with InfoNCE contrastive loss
+2. Fine-tuning on COCO with BiContrastiveLoss + auxiliary encoders (EVA02-Large, ViT-B/16)
 
-```
-Target Image --> CLIP ViT-B/32 (frozen) --> 512-dim Embedding --> Decoder --> Noise --> clamp [-eps, eps]
-Clean Image + Noise --> Adversarial Image
-```
+| Parameter | Value |
+|-----------|-------|
+| Surrogate | CLIP ViT-B/32 (frozen) |
+| Decoder | FC + 4x (ResBlock + EfficientAttention + Upsample), ~28M params |
+| Pre-training data | LAION-Art (~830K images downloaded, ~12% of 8M) |
+| eps | 16/255 |
 
-| Detail | Value |
-|--------|-------|
-| Surrogate encoder | CLIP ViT-B/32 (frozen) |
-| Decoder | FC + 4x (ResBlock + EfficientAttention + Upsample), ~10M params |
-| Pre-training data | LAION-Art (830K images downloaded so far) |
-| Fine-tuning data | MS-COCO |
-| Perturbation | L-inf, eps = 16/255 |
-| Pre-training time | ~3-5h on 1x H200 |
-| Fine-tuning time | ~1-2h on 1x H200 |
-
-See [`demo_S2_AnyAttack/README.md`](demo_S2_AnyAttack/README.md) for full details.
-
-### Quick Start
-
-```bash
-cd demo_S2_AnyAttack
-
-# Pre-train on LAION-Art
-sbatch hpc_train.sh pretrain
-
-# Fine-tune on COCO
-sbatch hpc_train.sh finetune
-
-# Generate adversarial image
-python demo.py --decoder-path checkpoints/finetuned.pt \
-               --clean-image dog.jpg --target-image cat.jpg
-```
+**Current Status**: Code complete. LAION-Art dataset download in progress (~12%). Training will begin when sufficient data is available (~80K+ images). Results will be compared against AnyAttack_LAION400M.
 
 ---
 
-## Demo_S2P: AnyAttack Official Weights
+## Demo_S2P: AnyAttack_LAION400M
 
 **Directory**: [`demo_S2P/`](demo_S2P/) | **Status**: Ready
 
-Inference-only demo using AnyAttack's **official pre-trained weights** from HuggingFace (pre-trained on LAION-400M + fine-tuned on COCO). No training required -- runs on a local GPU (RTX 4090).
+**Purpose**: Inference-only demo using AnyAttack's **official pre-trained weights** from HuggingFace (`jiamingzz/anyattack`). Pre-trained on LAION-400M + fine-tuned on COCO. No training required.
 
-Uses the same Decoder architecture as Demo_S2, but with the authors' fully trained `coco_bi.pt` checkpoint. Evaluates adversarial transferability against BLIP-2, DeepSeek-VL, and Qwen2.5-VL.
+**How it works**:
+1. Target image → CLIP ViT-B/32 → 512-dim embedding (spatial info lost)
+2. Decoder(embedding) → noise pattern (224x224, no visual resemblance to target)
+3. Adversarial image = clean image + clamp(noise, -eps, eps)
 
-### Quick Start
+The decoder generates noise from a **semantic embedding**, not from the visual appearance. Human eye sees the clean image; CLIP sees the target.
 
-```bash
-cd demo_S2P
-python download_weights.py
-python demo.py --clean-image ../demo_images/ORIGIN_dog.png \
-               --target-image ../demo_images/ORIGIN_cat.png
-python evaluate.py --adv-image outputs/adversarial.png \
-                   --clean-image ../demo_images/ORIGIN_dog.png \
-                   --target-image ../demo_images/ORIGIN_cat.png
-```
+| Parameter | Value |
+|-----------|-------|
+| Checkpoint | `coco_bi.pt` (335 MB, downloaded) |
+| Input | Clean image (224x224) + Target image (224x224) |
+| Output | Adversarial image (224x224, visually ≈ clean) |
+| eps | 16/255 |
+
+**Conclusion**: Works out of the box. Used as the fusion component in the final VisInject pipeline.
 
 ---
 
 ## Demo_S3: UniversalAttack
 
-**Directory**: [`demo_S3_UniversalAttack/`](demo_S3_UniversalAttack/) | **Paper**: [arXiv 2502.07987](https://arxiv.org/abs/2502.07987)
+**Directory**: [`demo_S3_UniversalAttack/`](demo_S3_UniversalAttack/) | **Paper**: [arXiv 2502.07987](https://arxiv.org/abs/2502.07987) | **Status**: Ready
 
-Directly optimizes a single universal image's pixel values so that any MLLM will respond with a target phrase (e.g., "Sure, here it is") regardless of the user's question. No neural network is trained -- only the image pixels are optimized via AdamW.
+**Purpose**: Optimize a **single universal adversarial image** that forces any MLLM to respond with a target phrase (e.g., "Sure, here it is") regardless of the user's question.
 
-**Parameterization**: `z = clip(z0 + gamma * tanh(z1) + noise, 0, 1)`, where `z1` is the trainable parameter and `gamma` controls perturbation scale.
+**Method**: Direct pixel optimization via AdamW. No neural network trained.
+- Parameterization: `z = clip(z0 + gamma * tanh(z1), 0, 1)` where z1 is trainable
+- Loss: Masked cross-entropy on target tokens, summed across all target models
+- Supports **multi-model joint attack** for cross-architecture transferability
 
-```
-z0 (gray 0.5) + gamma * tanh(z1) + quantization noise --> VLM (frozen, grad flows) --> Masked CE Loss --> backprop to z1
-```
-
-| Detail | Value |
-|--------|-------|
-| Trainable parameters | Image pixels only (z1 tensor) |
+| Parameter | Value |
+|-----------|-------|
+| Trainable | Image pixels only (z1 tensor) |
 | Optimizer | AdamW, lr = 0.01 |
 | Steps | 2000 (single-model) / 3000 (multi-model) |
-| Training time | ~30 min (single) / ~1-2h (multi) on 1x H200 |
-| gamma | 0.1 (single-model) / 0.5 (multi-model) |
-| Quantization robustness | Calibrated Gaussian noise |
+| gamma | 0.1 (single) / 0.5 (multi) |
+| Supported VLMs | Qwen, BLIP-2, DeepSeek, LLaVA, Phi, Llama (6 families) |
 
-Supports both **single-model** and **multi-model** attacks, controlled by `--target-models`. Also supports multi-answer, Gaussian blur, and localization attack variants.
+**Paper results** (SafeBench ASR %):
+| Model | Single | Multi-Answer |
+|-------|--------|-------------|
+| Phi-3.5 | 15% | 81.3% |
+| Llama-3.2-11B | 15% | 70.4% |
+| Qwen2-VL-2B | 21.4% | 79.3% |
+| LLaVA-1.5-7B | 44% | 46% |
 
-See [`demo_S3_UniversalAttack/README.md`](demo_S3_UniversalAttack/README.md) for full details.
-
-### Quick Start
-
-```bash
-cd demo_S3_UniversalAttack
-
-# Single-model attack
-python attack.py --target-models qwen2_5_vl_3b --num-steps 2000
-
-# Multi-model attack
-python attack.py --target-models qwen2_5_vl_3b phi_3_5_vision --num-steps 3000
-
-# Evaluate
-python evaluate.py --image outputs/universal_final.png --target-models qwen2_5_vl_3b
-```
+**Conclusion**: Effective universal attack. Multi-model joint optimization enables cross-architecture transferability. Used as the prompt→image component in the final VisInject pipeline.
 
 ---
 
 ## Supporting Directories
 
-### `LAION_ART_DATA/`
-
-Scripts for downloading the LAION-Art dataset (~8M images) used for Demo_S2 pre-training.
-
-- `download_laion_art.sh` -- SLURM job script with test/full/resume modes
-- `download_images.py` -- Robust multi-threaded image downloader with retry, resume, and comprehensive logging
-- `download_parquet_metadata.sh` -- Downloads 128 parquet metadata shards from HuggingFace
-- `verify_dataset.py` -- Integrity checker for downloaded WebDataset shards
-
-### `demo_images/`
-
-Source images used across demos (cat, dog, kpop, bill) and generated adversarial examples.
-
-### `demo_screenshots/`
-
-Screenshots and presentation materials demonstrating attack results.
-
----
-
-## Shared Infrastructure
-
-### Model Registry
-
-All demos use the centralized [`model_registry.py`](../model_registry.py) at the project root. It stores HuggingFace model IDs, image sizes, normalization parameters, and VRAM estimates for 11+ VLMs. To add a new model, add an entry to `REGISTRY` -- no demo code changes needed.
-
-### Common Attack Flow
-
-All PGD-based demos (Demo_0 through Demo3) follow the same pattern:
-
-1. Load the target VLM with gradients enabled
-2. Tokenize the target phrase into token IDs
-3. Initialize perturbation `delta = 0`
-4. For each PGD step:
-   - Forward pass: `image + delta` through the VLM
-   - Compute masked cross-entropy loss on target tokens
-   - Backpropagate to get `grad_delta`
-   - Update: `delta = delta - alpha * sign(grad_delta)`
-   - Project: `delta = clamp(delta, -eps, eps)`
-5. Apply Quantization-Aware Attack (QAA): `image_quant = round(image * 255) / 255`
-6. Save adversarial image as PNG
-
----
+| Directory | Purpose |
+|-----------|---------|
+| [`data_preparation/`](../data_preparation/) | Download scripts for LAION-Art dataset, VLM models, and demo images. Moved from `LAION_ART_DATA/`. See [`data_preparation/README.md`](../data_preparation/README.md). |
+| `demo_images/` | Source images (cat, dog, kpop, bill) and generated adversarial examples used across demos. |
+| `demo_screenshots/` | Screenshots and presentation materials demonstrating attack results. |
+| `demos_presentation/` | Auto-generated PowerPoint presentation of the project. |
+| `demo_web.py` | Gradio web UI for inference on BLIP-2, DeepSeek-VL, Qwen2.5-VL. Supports dynamic model switching. |
 
 ## Hardware Requirements
 
@@ -353,26 +248,30 @@ All PGD-based demos (Demo_0 through Demo3) follow the same pattern:
 | Demo2 | 6 GB | RTX 3060+ |
 | Demo3 | 12 GB | RTX 3090 / A100 |
 | Demo_S1 | 14 GB | RTX 4090 / A100 |
-| Demo_S2 (train) | 20 GB | A100 / H100 / H200 |
-| Demo_S3 (train) | 12 GB | RTX 3090+ |
+| Demo_S2 (train) | 20 GB | A100 / H200 |
+| Demo_S2P (infer) | 2 GB | Any GPU |
+| Demo_S3 (single) | 12 GB | RTX 3090+ |
+| Demo_S3 (multi, 5 models) | 37 GB | H200 / A100 80GB |
 
-All demos have been tested on NVIDIA H200 (80 GB HBM3) via SLURM on the Tufts HPC cluster.
+All demos tested on NVIDIA H200 (80 GB HBM3) via SLURM on Tufts HPC cluster.
 
----
+## Shared Infrastructure
+
+- **Model Registry** ([`model_registry.py`](../model_registry.py)): Centralized registry for 13+ VLMs with HuggingFace IDs, image sizes, normalization params, VRAM estimates. Add a new model by adding one dict entry.
+- **Common PGD Flow** (Demo_0 through Demo3): Load VLM → tokenize target → PGD loop (forward, CE loss, backprop, sign update, clamp) → QAA → save PNG.
 
 ## Final VisInject Pipeline
 
-The final system combines S3 and S2:
-
-1. **S3** optimizes a universal adversarial image that encodes a target prompt into visual features
-2. The abstract image from S3 is fed through **CLIP ViT-B/32** to get a 512-dim embedding
-3. **S2's Decoder** generates bounded noise from that embedding
-4. The noise is added to any natural carrier image, producing a natural-looking adversarial image that carries the injected prompt
+The final system (in [`../visinject/`](../visinject/)) combines UniversalAttack + AnyAttack_LAION400M:
 
 ```
-Target Prompt --> [S3 Pixel Optimization] --> Abstract Image --> [CLIP Encode] --> [S2 Decoder] --> Noise
-                                                                                                     |
-                                                                       Carrier Image + Noise --> VisInject Image
+Target Prompt ──> [UniversalAttack: multi-model pixel optimization] ──> Universal Image
+                                                                              │
+                                                                   [CLIP ViT-B/32 encode]
+                                                                              │
+                                                                   [AnyAttack Decoder]
+                                                                              │
+                                                                           Noise
+                                                                              │
+                                                        Clean Image + Noise ──> VisInject Image
 ```
-
-See the [project README](../README.md) for the full architecture and timeline.
