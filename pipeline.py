@@ -100,7 +100,7 @@ def run_universal_attack(
     print(f"  Steps: {num_steps} | Gamma: {gamma} | Mode: {'multi' if is_multi else 'single'}")
     print(f"  Target: \"{target_phrase}\"")
     print(f"  Models: {target_models}")
-    print(f"  Dataset: {dataset.num_safe} safe + {dataset.num_adversarial} adversarial questions\n")
+    print(f"  Dataset: {len(dataset)} questions\n")
 
     best_loss = float("inf")
     t0 = time.time()

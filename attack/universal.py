@@ -117,7 +117,7 @@ def main(args):
 
     print(f"\nStarting optimization: {args.num_steps} steps")
     print(f"Target phrase: \"{args.target_phrase}\"")
-    print(f"Dataset: {dataset.num_safe} safe + {dataset.num_adversarial} adversarial questions")
+    print(f"Dataset: {len(dataset)} questions")
     print()
 
     best_loss = float("inf")
