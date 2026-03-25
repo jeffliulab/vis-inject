@@ -28,7 +28,7 @@ PROMPT_TAGS=(
 # --- Model configs ---
 MODELS_2="qwen2_5_vl_3b blip2_opt_2_7b"
 MODELS_3="qwen2_5_vl_3b blip2_opt_2_7b deepseek_vl_1_3b"
-MODELS_4="qwen2_5_vl_3b blip2_opt_2_7b deepseek_vl_1_3b phi_3_5_vision"
+MODELS_4="qwen2_5_vl_3b blip2_opt_2_7b deepseek_vl_1_3b qwen2_vl_2b"
 
 MODEL_CONFIGS=("$MODELS_2" "$MODELS_3" "$MODELS_4")
 MODEL_TAGS=("2m" "3m" "4m")
