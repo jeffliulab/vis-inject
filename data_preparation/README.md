@@ -1,69 +1,48 @@
-# Data Preparation
+# `data_preparation/` — 数据/模型下载工具
 
-Scripts for downloading and preparing all data needed by the VisInject pipeline.
+VisInject 运行时所需的两类外部资源（VLM 权重 + AnyAttack decoder 权重）的下载脚本。**所有下载都建议在 HPC 登录节点跑**（计算节点访问不了 HuggingFace CDN）。
 
-## Directory Structure
+## 目录结构
 
 ```
 data_preparation/
-├── laion_art/                    # LAION-Art dataset (~8M art images)
-│   ├── download_parquet_metadata.sh  # Step 1: metadata (login node)
-│   ├── download_images.py            # Step 2: images (compute node)
-│   ├── download_laion_art.sh         # SLURM wrapper for Step 2
-│   └── verify_dataset.py            # Step 3: verification
-├── models/
-│   ├── download_all_models.py        # Download HF VLMs for pipeline
-│   └── download_decoder_weights.py   # Download AnyAttack decoder
-└── demo_images/
-    └── upload_demo_images.sh         # Upload test images to HPC
+├── README.md                       # 本文件
+└── models/
+    ├── download_all_models.py      # 5 个 VLM + CLIP（HuggingFace）
+    └── download_decoder_weights.py # AnyAttack coco_bi.pt
 ```
 
-## Quick Start (HPC)
-
-### 1. Download VLM models
+## 1. 下载 VLM 权重
 
 ```bash
-# On login node (has internet):
-python data_preparation/models/download_all_models.py --stage quick   # 3 VLMs + CLIP (~16GB)
-python data_preparation/models/download_all_models.py --stage full    # 5 VLMs + CLIP (~38GB)
+# 在登录节点跑（有 internet）
+export HF_HOME=/cluster/tufts/c26sp1ee0141/pliu07/model_cache
+
+# 三个核心 VLM（约 13 GB）
+python data_preparation/models/download_all_models.py --stage quick
+# = qwen2_5_vl_3b + blip2_opt_2_7b + clip-vit-base-patch32
+
+# 全部 5 个 VLM（约 37 GB）
+python data_preparation/models/download_all_models.py --stage full
+# = quick + deepseek_vl_1_3b + llava_1_5_7b + phi_3_5_vision
 ```
 
-### 2. Download AnyAttack decoder weights
+## 2. 下载 AnyAttack Decoder 权重
 
 ```bash
 python data_preparation/models/download_decoder_weights.py
+# 输出: checkpoints/coco_bi.pt （约 320 MB）
 ```
 
-### 3. Upload demo images
+来自 AnyAttack (CVPR 2025) 官方 HuggingFace 仓库 `jiamingzz/anyattack`。VisInject 直接复用这份预训练权重，没有自训练 decoder（评估过 LAION-Art 18K 图片相比原论文 LAION-400M 差距过大，性价比不足）。
 
-```bash
-bash data_preparation/demo_images/upload_demo_images.sh
-```
+## HPC 路径
 
-### 4. (Optional) Download LAION-Art for self-training
-
-Only needed if you want to train your own AnyAttack decoder (demo_S2).
-The pipeline works with the pretrained `coco_bi.pt` weights.
-
-```bash
-# Step 1: Parquet metadata (login node, ~1.3 GB)
-bash data_preparation/laion_art/download_parquet_metadata.sh
-
-# Step 2: Images (compute node, ~80-150 GB)
-sbatch data_preparation/laion_art/download_laion_art.sh test    # verify setup
-sbatch data_preparation/laion_art/download_laion_art.sh full    # full download
-sbatch data_preparation/laion_art/download_laion_art.sh resume  # if interrupted
-
-# Step 3: Verify
-python data_preparation/laion_art/verify_dataset.py
-```
-
-## HPC Paths
-
-| Resource | Path |
-|----------|------|
-| Model cache | `/cluster/tufts/c26sp1ee0141/pliu07/model_cache` |
-| LAION metadata | `/cluster/tufts/c26sp1ee0141/pliu07/LAION_ART/metadata` |
-| LAION images | `/cluster/tufts/c26sp1ee0141/pliu07/LAION_ART/webdataset` |
+| 资源 | 路径 |
+|---|---|
 | Conda env | `/cluster/tufts/c26sp1ee0141/pliu07/condaenv/visinject` |
-| Decoder weights | `demos/demo_S2P/checkpoints/coco_bi.pt` |
+| HF 模型缓存 | `/cluster/tufts/c26sp1ee0141/pliu07/model_cache` |
+| Decoder 权重（仓库内） | `checkpoints/coco_bi.pt` |
+| Work dir | `/cluster/tufts/c26sp1ee0141/pliu07/vis_inject` |
+
+完整 HPC 工作流见 [`../docs/HPC_GUIDE.md`](../docs/HPC_GUIDE.md)。
