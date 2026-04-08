@@ -4,12 +4,12 @@ VisInject Configuration
 Unified config for the end-to-end pipeline:
   UniversalAttack (pixel optimization) + AnyAttack_LAION400M (decoder fusion).
 
-Extends model_registry for environment setup and model info.
+Extends models.registry for environment setup and model info.
 """
 
 import os
 
-from model_registry import init_model_env
+from models.registry import init_model_env
 
 init_model_env()
 
@@ -43,7 +43,7 @@ UNIVERSAL_ATTACK_CONFIG = {
 # joint optimization. VRAM usage is cumulative across all enabled models.
 #
 # To add a new architecture:
-#   1. Add a REGISTRY entry in model_registry.py
+#   1. Add a REGISTRY entry in models/registry.py
 #   2. Implement an MLLMWrapper subclass in demos/demo_S3_UniversalAttack/models/
 #      (must implement load(), compute_masked_ce_loss(), generate())
 #
@@ -90,17 +90,6 @@ ANYATTACK_CONFIG = {
     "image_size": 224,
 }
 
-# Optional: AnyAttack_LAIONArt self-trained decoder for comparison
-ANYATTACK_LAIONART_CONFIG = {
-    "decoder_path": os.path.join(
-        os.path.dirname(__file__), "..", "demos", "demo_S2_AnyAttack",
-        "checkpoints", "best_decoder.pt"
-    ),
-    "clip_model": "ViT-B/32",
-    "embed_dim": 512,
-    "eps": 16 / 255,
-    "image_size": 224,
-}
 
 # ── Evaluation ────────────────────────────────────────────────────
 
@@ -112,7 +101,7 @@ EVAL_CONFIG = {
 
 # ── LLM-as-Judge: API-based evaluation ─────────────────────────────
 # Response pairs are generated on HPC, then judged locally via API.
-# Usage: python judge.py --pairs-file response_pairs.json
+# Usage: python -m evaluate.judge --pairs-file response_pairs.json
 
 JUDGE_CONFIG = {
     "judges": [

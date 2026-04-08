@@ -40,7 +40,7 @@ FAMILY_WRAPPER_MAP = {
 
 def get_wrapper_for_model(model_key: str, device: torch.device):
     """Instantiate the appropriate wrapper based on model family."""
-    from model_registry import get_model_info
+    from models.registry import get_model_info
     info = get_model_info(model_key)
     family = info["family"]
 

@@ -8,12 +8,12 @@ The Decoder generates noise from the *semantic embedding* of the universal image
 not its visual appearance. All clean images share the same noise pattern.
 
 Usage:
-    python generate.py --universal-image outputs/universal/universal_final.png \
-                       --clean-images ../demos/demo_images/ORIGIN_dog.png
+    python generate.py --universal-image outputs/experiments/exp_url_2m/universal/universal_<hash>.png \
+                       --clean-images images/ORIGIN_dog.png
 
-    python generate.py --universal-image outputs/universal/universal_final.png \
-                       --clean-images img1.png img2.png img3.png \
-                       --decoder-path ../demos/demo_S2P/checkpoints/coco_bi.pt
+    python generate.py --universal-image outputs/experiments/exp_url_2m/universal/universal_<hash>.png \
+                       --clean-images images/ORIGIN_dog.png images/ORIGIN_cat.png \
+                       --decoder-path checkpoints/coco_bi.pt
 """
 
 import argparse
@@ -98,7 +98,7 @@ def main():
 
     if not os.path.exists(args.decoder_path):
         print(f"Decoder checkpoint not found: {args.decoder_path}")
-        print("Download it with: cd ../demos/demo_S2P && python download_weights.py")
+        print("Download it with: python data_preparation/models/download_decoder_weights.py")
         sys.exit(1)
 
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")

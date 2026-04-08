@@ -2,16 +2,6 @@
 # VisInject 项目 .gitignore
 # ============================================================
 
-# 特别的ignore
-data
-test
-hpc_train_with_hf_env.sh
-自用说明书.txt
-架构复习_.md 
-预训练复习_.md
-demos_presentation
-项目报告.md
-
 # ---- Python 字节码 ----
 __pycache__/
 *.py[cod]
@@ -20,15 +10,6 @@ __pycache__/
 
 # ---- 统一模型缓存目录（HuggingFace 权重，体积大）----
 model_cache/
-
-# ---- 训练数据（图像数据集，体积大）----
-# 通过 prepare_data.py 生成，不纳入版本控制
-**/data/train/
-**/data/test/
-**/data/oracle/
-**/data/*.zip
-**/data/*.tar
-**/data/*.tar.gz
 
 # ---- 模型权重和中间张量（可能很大）----
 **/*.pt
@@ -40,31 +21,33 @@ model_cache/
 **/checkpoints/
 **/temp/
 
-# ---- 训练运行日志（由训练脚本自动生成，可本地保留但不入库）----
-# 如果你想保留某次重要实验的结果，可以 git add -f 强制追踪
-**/logs_and_outputs/stage1*/
-**/logs_and_outputs/stage2*/
-**/logs_and_outputs/eval_*/
-logs_and_outputs
-logs_and_outputs_archive
-
-# ---- 演示图像和样本（体积大，本地保留即可）----
-demo_images
-sample
-sample_archive
-demo_screenshots
-demo_screenshots_archive
+# ---- 实验输出 ----
+# `outputs/experiments/` 和 `outputs/experiments_v2_dog_only/` 是已下载的实验快照，
+# 是叙事/复现性资料，应该入 git（约 32 MB）。
+# 但单次运行的临时输出目录（由 hpc_pipeline.sh full 模式默认创建）绝不入库：
+outputs/universal/
+outputs/adversarial/
+outputs/results/
 
 # ---- HuggingFace / PyTorch 缓存（位于用户目录，不在项目内）----
 .cache/
 *.cache
 
+# ---- 环境变量 (含 API key) ----
+.env
+
+# ---- 虚拟环境 ----
+venv/
+env/
+.venv/
+ENV/
+
 # ---- IDE 配置 ----
 .vscode/
 .idea/
+.cursor/
 *.suo
 *.user
-.cursor/
 
 # ---- 操作系统生成文件 ----
 Thumbs.db
@@ -84,16 +67,8 @@ build/
 pip-wheel-metadata/
 *.whl
 
-# ---- 虚拟环境 ----
-venv/
-env/
-.env
-.venv/
-ENV/
-
 # ---- Jupyter Notebook ----
 .ipynb_checkpoints/
-*.ipynb
 
 # ---- 临时文件 ----
 *.tmp
@@ -102,12 +77,3 @@ ENV/
 *.swp
 *.swo
 *~
-
-# ---- 大型二进制演示文件（可单独管理）----
-*.pptx
-*.ppt
-*.key
-*.pdf
-
-# ---- 其他 ----
-过期文件存档备用/

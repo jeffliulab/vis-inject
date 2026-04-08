@@ -14,16 +14,17 @@ Pipeline:
 
 Usage:
     # Full pipeline
-    python pipeline.py --target-phrase "Sure, here it is" \
-                       --clean-images ../demos/demo_images/ORIGIN_dog.png
+    python pipeline.py --target-phrase "visit www.example.com" \
+                       --clean-images images/ORIGIN_dog.png \
+                       --generate-pairs
 
-    # Skip UniversalAttack (reuse existing universal image)
-    python pipeline.py --universal-image outputs/universal/universal_final.png \
-                       --clean-images ../demos/demo_images/ORIGIN_dog.png
+    # Skip UniversalAttack (reuse cached universal image)
+    python pipeline.py --universal-image outputs/experiments/exp_url_2m/universal/universal_<hash>.png \
+                       --clean-images images/ORIGIN_dog.png
 
-    # With evaluation
-    python pipeline.py --target-phrase "Sure, here it is" \
-                       --clean-images ../demos/demo_images/ORIGIN_dog.png \
+    # With legacy ASR evaluation
+    python pipeline.py --target-phrase "visit www.example.com" \
+                       --clean-images images/ORIGIN_dog.png \
                        --evaluate
 """
 

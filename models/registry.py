@@ -37,7 +37,7 @@ Quick Reference (注册键速查表)
     python attack.py --target-models qwen2_vl_2b blip2_opt_2_7b  # 多模型 (~9 GB, 显存累加)
 
 quick view model summary:
-python -c "from model_registry import print_registry_summary; print_registry_summary()"
+python -c "from models.registry import print_registry_summary; print_registry_summary()"
 
 """
 

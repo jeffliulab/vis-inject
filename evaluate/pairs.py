@@ -1,25 +1,26 @@
 """
-VisInject Evaluation
-=====================
-Comprehensive evaluation of adversarial images against target VLMs.
+VisInject Stage 3a — Response Pair Generation
+==============================================
+Queries target VLMs on (clean, adversarial) image pairs and dumps responses
+as JSON for downstream LLM-as-Judge evaluation (`evaluate/judge.py`).
 
-Metrics:
+Also exposes legacy ASR / CLIP / caption metrics (kept for compatibility
+with `pipeline.py --evaluate`):
   1. ASR (Attack Success Rate): does the VLM respond with the target phrase?
   2. CLIP similarity: embedding shift between clean/adversarial/universal images
   3. VLM captions: side-by-side comparison of clean vs adversarial vs universal
   4. Image quality: PSNR, L-inf noise magnitude
-  5. Decoder comparison: AnyAttack_LAION400M vs AnyAttack_LAIONArt (if available)
 
-Usage:
-    python evaluate.py --adv-images outputs/adversarial/adv_dog.png \
-                       --clean-images ../demos/demo_images/ORIGIN_dog.png \
-                       --universal-image outputs/universal/universal_final.png
+Module path: `evaluate.pairs`. Run as a module so the project root stays on
+sys.path:
 
-    # With decoder comparison
-    python evaluate.py --adv-images outputs/adversarial/adv_dog.png \
-                       --clean-images ../demos/demo_images/ORIGIN_dog.png \
-                       --universal-image outputs/universal/universal_final.png \
-                       --compare-decoders
+    python -m evaluate.pairs \\
+        --adv-images outputs/experiments/exp_url_2m/adversarial/adv_ORIGIN_dog.png \\
+        --clean-images images/ORIGIN_dog.png \\
+        --universal-image outputs/experiments/exp_url_2m/universal/universal_<hash>.png
+
+The HPC `pipeline.py` calls `generate_response_pairs()` directly via
+`from evaluate import generate_response_pairs`.
 """
 
 import argparse
@@ -32,7 +33,7 @@ import torch.nn.functional as F
 from PIL import Image
 
 from config import (
-    EVAL_CONFIG, ANYATTACK_CONFIG, ANYATTACK_LAIONART_CONFIG,
+    EVAL_CONFIG, ANYATTACK_CONFIG,
     UNIVERSAL_ATTACK_CONFIG, OUTPUT_CONFIG,
 )
 from utils import (
@@ -233,7 +234,7 @@ def evaluate_captions(
     except ImportError:
         print("  [WARN] AutoModelForVision2Seq not available, skipping captions")
         return {"error": "transformers version too old for AutoModelForVision2Seq"}
-    from model_registry import get_model_info
+    from models.registry import get_model_info
 
     results = {}
 
@@ -292,74 +293,6 @@ def evaluate_image_quality(
     return {"psnr": psnr, "linf": linf, "l2": l2}
 
 
-def evaluate_decoder_comparison(
-    universal_image_path: str,
-    clean_image_path: str,
-    device: torch.device,
-) -> dict:
-    """Compare AnyAttack_LAION400M vs AnyAttack_LAIONArt decoders."""
-    import torchvision
-
-    print("\n  Comparing decoders (LAION400M vs LAIONArt)...")
-    clip_encoder = CLIPEncoder("ViT-B/32").to(device)
-
-    universal = load_image(universal_image_path, 224).to(device)
-    clean = load_image(clean_image_path, 224).to(device)
-
-    with torch.no_grad():
-        emb_target = clip_encoder.encode_img(universal)
-
-    results = {}
-
-    for name, cfg in [("LAION400M", ANYATTACK_CONFIG), ("LAIONArt", ANYATTACK_LAIONART_CONFIG)]:
-        if not os.path.exists(cfg["decoder_path"]):
-            print(f"    [{name}] Decoder not found: {cfg['decoder_path']} — skipping")
-            results[name] = {"status": "not_available"}
-            continue
-
-        decoder = load_decoder(cfg["decoder_path"], cfg["embed_dim"], device)
-        with torch.no_grad():
-            noise = decoder(emb_target)
-            noise = torch.clamp(noise, -cfg["eps"], cfg["eps"])
-            adv = torch.clamp(clean + noise, 0, 1)
-
-            emb_adv = clip_encoder.encode_img(adv)
-            emb_clean = clip_encoder.encode_img(clean)
-            emb_target_n = F.normalize(emb_target, p=2, dim=1)
-            emb_adv_n = F.normalize(emb_adv, p=2, dim=1)
-            emb_clean_n = F.normalize(emb_clean, p=2, dim=1)
-
-            sim_adv_target = (emb_adv_n * emb_target_n).sum().item()
-            sim_clean_target = (emb_clean_n * emb_target_n).sum().item()
-
-        psnr = compute_psnr(clean, adv)
-        linf = noise.abs().max().item()
-
-        results[name] = {
-            "status": "ok",
-            "psnr": psnr,
-            "linf": linf,
-            "sim_adv_target": sim_adv_target,
-            "sim_clean_target": sim_clean_target,
-            "sim_shift": sim_adv_target - sim_clean_target,
-        }
-
-        # Save comparison image
-        out_dir = OUTPUT_CONFIG["adversarial_dir"]
-        os.makedirs(out_dir, exist_ok=True)
-        basename = os.path.splitext(os.path.basename(clean_image_path))[0]
-        torchvision.utils.save_image(adv[0], os.path.join(out_dir, f"adv_{basename}_{name}.png"))
-
-        print(f"    [{name}] PSNR: {psnr:.1f} dB | L-inf: {linf:.4f} | "
-              f"Sim shift: {results[name]['sim_shift']:+.4f}")
-
-        del decoder
-
-    del clip_encoder
-    torch.cuda.empty_cache()
-    return results
-
-
 def run_evaluation(
     adv_paths: list[str],
     clean_paths: list[str],
@@ -370,7 +303,6 @@ def run_evaluation(
     eval_vlms: list[str] = None,
     num_adversarial: int = None,
     num_safe: int = None,
-    compare_decoders: bool = False,
 ):
     """Run comprehensive evaluation on adversarial images."""
     cfg = EVAL_CONFIG
@@ -411,12 +343,6 @@ def run_evaluation(
             adv_path, clean_path, universal_path, eval_vlms, device,
         )
 
-        # 5. Decoder comparison (optional)
-        if compare_decoders and universal_path:
-            pair_result["decoder_comparison"] = evaluate_decoder_comparison(
-                universal_path, clean_path, device,
-            )
-
         all_results[pair_key] = pair_result
 
     # Save results
@@ -450,8 +376,6 @@ def main():
     parser.add_argument("--num-adversarial", type=int,
                         default=EVAL_CONFIG["num_adversarial_questions"])
     parser.add_argument("--num-safe", type=int, default=EVAL_CONFIG["num_safe_questions"])
-    parser.add_argument("--compare-decoders", action="store_true",
-                        help="Compare LAION400M vs LAIONArt decoders")
     parser.add_argument("--output-dir", type=str, default=OUTPUT_CONFIG["results_dir"])
     parser.add_argument("--device", type=str, default="cuda:0")
     args = parser.parse_args()
@@ -473,7 +397,6 @@ def main():
         eval_vlms=args.eval_vlms,
         num_adversarial=args.num_adversarial,
         num_safe=args.num_safe,
-        compare_decoders=args.compare_decoders,
     )
 
 

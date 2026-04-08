@@ -27,8 +27,13 @@ HF_HOME="/cluster/tufts/c26sp1ee0141/pliu07/model_cache"
 # Select mode: full | inject | eval | compare
 MODE="${1:-full}"
 
-# Default clean image (override with $2)
-CLEAN_IMAGE="${2:-../demos/demo_images/ORIGIN_dog.png}"
+# Clean images: pass as args after mode, or defaults to all images in images/
+shift || true
+if [ $# -gt 0 ]; then
+    CLEAN_IMAGES="$@"
+else
+    CLEAN_IMAGES="images/ORIGIN_dog.png images/ORIGIN_cat.png images/ORIGIN_bill.png images/ORIGIN_kpop.png images/ORIGIN_webpage.png images/ORIGIN_code.png images/ORIGIN_chat.png"
+fi
 
 ############################
 # Modules
@@ -48,7 +53,7 @@ echo "===== VisInject Pipeline ====="
 echo "JobID : ${SLURM_JOB_ID}"
 echo "Node  : ${SLURM_NODELIST}"
 echo "Mode  : ${MODE}"
-echo "Image : ${CLEAN_IMAGE}"
+echo "Images: ${CLEAN_IMAGES}"
 echo "=============================="
 ${PYTHON} -V
 nvidia-smi || true
@@ -63,7 +68,7 @@ case "${MODE}" in
         echo "[MODE] Full pipeline: UniversalAttack + AnyAttack fusion + evaluation"
         srun -n 1 -c ${SLURM_CPUS_PER_TASK:-8} \
             ${PYTHON} pipeline.py \
-                --clean-images "${CLEAN_IMAGE}" \
+                --clean-images ${CLEAN_IMAGES} \
                 --num-steps 3000 \
                 --evaluate
         ;;
@@ -77,7 +82,7 @@ case "${MODE}" in
         srun -n 1 -c ${SLURM_CPUS_PER_TASK:-8} \
             ${PYTHON} generate.py \
                 --universal-image "${UNIVERSAL_IMG}" \
-                --clean-images "${CLEAN_IMAGE}"
+                --clean-images ${CLEAN_IMAGES}
         ;;
     eval)
         echo "[MODE] Evaluation only"
@@ -88,25 +93,14 @@ case "${MODE}" in
             exit 1
         fi
         srun -n 1 -c ${SLURM_CPUS_PER_TASK:-8} \
-            ${PYTHON} evaluate.py \
+            ${PYTHON} -m evaluate.pairs \
                 --adv-images "${ADV_IMG}" \
-                --clean-images "${CLEAN_IMAGE}" \
+                --clean-images ${CLEAN_IMAGES} \
                 --universal-image "${UNIVERSAL_IMG}"
-        ;;
-    compare)
-        echo "[MODE] Decoder comparison (LAION400M vs LAIONArt)"
-        ADV_IMG=$(ls -t outputs/adversarial/adv_*.png 2>/dev/null | head -1)
-        UNIVERSAL_IMG=$(ls -t outputs/universal/universal_*.png 2>/dev/null | head -1)
-        srun -n 1 -c ${SLURM_CPUS_PER_TASK:-8} \
-            ${PYTHON} evaluate.py \
-                --adv-images "${ADV_IMG}" \
-                --clean-images "${CLEAN_IMAGE}" \
-                --universal-image "${UNIVERSAL_IMG}" \
-                --compare-decoders
         ;;
     *)
         echo "[ERROR] Unknown mode: ${MODE}"
-        echo "Usage: sbatch hpc_pipeline.sh [full|inject|eval|compare] [clean_image_path]"
+        echo "Usage: sbatch scripts/hpc_pipeline.sh [full|inject|eval] [clean_images...]"
         exit 1
         ;;
 esac

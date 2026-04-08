@@ -7,9 +7,9 @@ Two modes:
   - Quick mode: reuse cached UniversalAttack checkpoint (instant)
   - Full mode: run UniversalAttack optimization from scratch (shows progress)
 
-Usage:
-    python web_demo.py
-    python web_demo.py --port 7861 --share
+Usage (run from project root):
+    python demo/full_demo/web_demo.py
+    python demo/full_demo/web_demo.py --port 7861 --share
 """
 
 import argparse
@@ -20,7 +20,12 @@ import tempfile
 
 import torch
 
-sys.path.insert(0, os.path.dirname(__file__))
+# Add project root to sys.path so we can import config etc.
+# This file lives at demo/full_demo/web_demo.py, so project root is three dirnames up.
+sys.path.insert(
+    0,
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+)
 from config import (
     UNIVERSAL_ATTACK_CONFIG, ATTACK_TARGETS, ANYATTACK_CONFIG, OUTPUT_CONFIG,
 )

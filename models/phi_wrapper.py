@@ -11,7 +11,7 @@ import torch.nn.functional as F
 from PIL import Image
 import numpy as np
 
-from model_registry import get_model_info
+from .registry import get_model_info
 
 from .mllm_wrapper import MLLMWrapper
 

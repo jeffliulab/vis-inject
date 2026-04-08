@@ -1,21 +1,26 @@
 """
-LLM-as-Judge evaluation for VisInject adversarial images.
+VisInject Stage 3b — LLM-as-Judge
+==================================
+Reads `response_pairs_*.json` files (produced by `evaluate/pairs.py` on HPC)
+and uses LLM API calls (GPT-4o / Claude / GPT-4o-mini) to score whether the
+adversarial injection successfully influenced the VLM's responses.
 
-Reads response pairs (clean vs adversarial) generated on HPC, then uses
-LLM API calls (GPT-4o, Claude, GPT-4o-mini) to judge whether the
-adversarial injection influenced the VLM's behavior.
+Module path: `evaluate.judge`. Pure CPU + API; no GPU or PyTorch needed.
 
 Usage:
     # Full evaluation with all 3 judges:
-    python judge.py --pairs-file outputs/results/response_pairs_ORIGIN_dog.json
+    python -m evaluate.judge --pairs-file outputs/experiments/exp_url_2m/results/response_pairs_ORIGIN_dog.json
 
     # Quick test with 1 judge:
-    python judge.py --pairs-file response_pairs.json --judges gpt-4o-mini
+    python -m evaluate.judge --pairs-file <pairs.json> --judges gpt-4o-mini
 
     # Custom output path:
-    python judge.py --pairs-file response_pairs.json --output judge_results.json
+    python -m evaluate.judge --pairs-file <pairs.json> --output <judge_results.json>
 
-Environment variables required:
+    # Batch all 21 experiments × 7 images:
+    bash scripts/judge_all.sh --judges gpt-4o-mini
+
+Environment variables required (loaded from project-root `.env`):
     OPENAI_API_KEY      (for gpt-4o, gpt-4o-mini)
     ANTHROPIC_API_KEY   (for claude-sonnet)
 """

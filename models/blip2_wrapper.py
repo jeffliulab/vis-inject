@@ -11,7 +11,7 @@ from typing import Optional
 import torch
 import torch.nn.functional as F
 
-from model_registry import get_model_info
+from .registry import get_model_info
 
 from .mllm_wrapper import MLLMWrapper
 

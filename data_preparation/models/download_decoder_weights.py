@@ -23,8 +23,9 @@ def download(checkpoint: str = DEFAULT_CHECKPOINT, output_dir: str = None):
         sys.exit(1)
 
     if output_dir is None:
+        # Default: project_root/checkpoints/
         output_dir = os.path.join(
-            os.path.dirname(__file__), "..", "..", "demos", "demo_S2P", "checkpoints"
+            os.path.dirname(__file__), "..", "..", "checkpoints"
         )
     os.makedirs(output_dir, exist_ok=True)
 
@@ -53,7 +54,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--output-dir", type=str, default=None,
-        help="Output directory (default: demos/demo_S2P/checkpoints/)",
+        help="Output directory (default: <project_root>/checkpoints/)",
     )
     args = parser.parse_args()
     download(args.checkpoint, args.output_dir)
