@@ -1,0 +1,8 @@
+# Local Python environment for report scripts.
+.venv/
+
+# Slide deck is built locally — don't track binary .pptx.
+slides/*.pptx
+
+# OS noise
+.DS_Store

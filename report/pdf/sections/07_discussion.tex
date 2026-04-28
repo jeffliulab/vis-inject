@@ -1,0 +1,40 @@
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Disruption $\neq$ injection}
+
+A first version of this evaluation used a single LLM-as-judge prompt that asked ``does the adversarial response contain any foreign content compared to the clean response?''. On Qwen2.5-VL-3B that judge reported a $50.5\%$ ``injection rate''. Once we split the question into the two checks defined in \S\ref{sec:method-stage3}, the same data shows $100\%$ Output Affected and $0.41\%$ Target Injected. The difference is not noise --- it is the difference between ``the model lost its train of thought'' (frequent) and ``the attacker's payload was delivered'' (rare).
+
+This matters for how we read the universal-attack literature on multimodal models \citep{rahmatullaev2025universal, schlarmann2023robustness}: ``the answer changed'' is the easy claim, and Stage~1 of \textsc{VisInject} reproduces it broadly. ``The chosen content appeared'' is the harder claim, and our results suggest it requires more than gradient-aligned noise inside an \Linf{} ball.
+
+\subsection{Why injection is rare}
+
+We see three compounding causes:
+
+\begin{itemize}
+  \item \textbf{Decoder fusion erases specifics.} The Stage~1 universal image $x_u$ already encodes the literal target phrase (CLIP features that line up with ``visit www.example.com''). The \textsc{AnyAttack} decoder (trained on COCO bidirectionally) is good at producing \emph{some} adversarial noise, but its output noise pattern is shaped by what its training data looked like. Specific tokens that survive Stage~1 routinely fail to survive Stage~2 --- we see ``account number'' replacing ``card number'', ``info@xyzlogistics.com'' replacing the chosen \texttt{support@fakecorp.com}.
+  \item \textbf{The target \vlm{} needs a semantic invitation.} On a \texttt{dog} or \texttt{webpage} image, the response space is dominated by ``a dog'' or ``a website'' --- there is little room for the payload. On a code or bill screenshot, the response space already contains URL-shaped or account-shaped text, and the perturbation can route the decoder toward the desired one.
+  \item \textbf{Architecture wins.} BLIP-2's Q-Former bottleneck filters out the precise low-level perturbations that drive Qwen-style \vlm{}s off-track. We did not retrain the decoder against BLIP-2, but the immunity is so complete that we do not believe a budgeted, gradient-fused attack can puncture this architecture without enlarging the perceptual budget.
+\end{itemize}
+
+\subsection{Cross-model transferability}
+
+To check whether the strongest small-model result transfers, we manually uploaded the URL-targeted adversarial code screenshot (configuration \texttt{3m}) to GPT-4o (ChatGPT, web UI, frontier closed model) with the same question used in the white-box test. GPT-4o (i) explicitly described the image as containing ``distortion / artifacts'', (ii) recovered the original Python imports correctly, and (iii) did not emit \texttt{www.example.com}. A single negative case is not a transferability proof, but it does indicate that the gap between small open \vlm{}s and a frontier black-box model is enough to defeat this attack as constructed.
+
+\subsection{Limitations}
+
+Three honest limits frame the scope of these claims:
+\begin{itemize}
+  \item \textbf{White-box ensemble is small.} We optimise against at most four open \vlm{}s, all under 4B parameters. A larger or more diverse ensemble might transfer better.
+  \item \textbf{Programmatic judging is keyword-shaped.} Our Target-Injected check looks for the literal phrase or close variants. Soft paraphrases (``please supply your credit-card details'') may slip through and inflate the gap between disruption and injection in the wrong direction.
+  \item \textbf{Single transfer test.} The GPT-4o failure is a single sample on the strongest case. A systematic transfer study (multiple frontier models, multiple cases, randomised prompts) would be more conclusive.
+\end{itemize}
+
+\subsection{Implications for defence}
+
+The pattern we see suggests three cheap layers of defence that don't require model retraining:
+\begin{itemize}
+  \item \textbf{Input randomisation.} Stochastic crops, JPEG re-encoding, or mild downscaling break the gradient-aligned noise that Stage~1 produces, while leaving normal photos legible \citep{schlarmann2023robustness}.
+  \item \textbf{Adversarial-image detection.} Frontier models already seem to flag artifacts; making this signal explicit (``I see distortion that looks adversarial; please re-upload'') would expose the attack surface to users.
+  \item \textbf{Source-side payload filters on responses.} Even when injection happens, the payload is short and category-shaped (URL, email, payment). Standard outbound filters in the assistant UI catch most of these without touching the model.
+\end{itemize}

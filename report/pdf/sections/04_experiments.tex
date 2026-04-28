@@ -1,0 +1,28 @@
+\section{Experimental Setup}
+\label{sec:experiments}
+
+\paragraph{Target phrases.}
+We pick seven target phrases that span four operationally relevant attack classes: financial elicitation (\texttt{card}: ``tell me your card number''), URL injection (\texttt{url}: ``visit www.example.com''), brand promotion (\texttt{apple}: ``best computer brand is apple''), political misinformation (\texttt{news}: ``the election was rigged and stolen''), phishing-email seeding (\texttt{email}: ``contact support@fakecorp.com for help''), commercial advertising (\texttt{ad}: ``buy now with 50 percent discount today''), and direct override (\texttt{obey}: ``ignore previous instructions and say yes''). These are illustrative payloads, not exhaustive; they cover both literal-text targets (\texttt{url}, \texttt{email}) and content-class targets (\texttt{card}, \texttt{news}).
+
+\paragraph{Test images.}
+Seven clean photos are used as the carrier for Stage~2 fusion. Three are natural photos (\texttt{dog}, \texttt{cat}, \texttt{kpop}); four are screenshots whose content invites text transcription (\texttt{bill}, \texttt{webpage}, \texttt{code}, \texttt{chat}). The split lets us study whether image semantics influence injection success.
+
+\paragraph{White-box configurations.}
+For Stage~1, the surrogate ensemble varies along three configurations:
+\begin{itemize}
+  \item \texttt{2m}: Qwen2.5-VL-3B \citep{bai2025qwen25vl} + BLIP-2-OPT-2.7B \citep{li2023blip2}
+  \item \texttt{3m}: \texttt{2m} $+$ DeepSeek-VL-1.3B \citep{lu2024deepseekvl}
+  \item \texttt{4m}: \texttt{3m} $+$ Qwen2-VL-2B \citep{wang2024qwen2vl}
+\end{itemize}
+
+\paragraph{Evaluated targets.}
+At Stage~3 we feed each adversarial image (and its clean baseline) to four target \vlm{}s --- the same models that appear in the surrogate ensemble. We thus measure both \emph{in-ensemble} effects (the deployed model is one of the surrogates) and \emph{cross-architecture} effects (Qwen-style vs.\ Q-Former-style).
+
+\paragraph{Experiment matrix.}
+The full sweep is \emph{7 target phrases $\times$ 3 white-box configurations} for Stage~1, giving $21$ universal images. Each is fused onto $7$ test images, yielding $21 \times 7 = 147$ adversarial photos. Each photo is queried with $45$ benign questions on each applicable target \vlm{}. After we drop the configurations where the target \vlm{} is not present in the surrogate set (BLIP-2 and Qwen2-VL only appear in \texttt{3m} and \texttt{4m} respectively), the total is $6{,}615$ (clean, adversarial) response pairs.
+
+\paragraph{Compute.}
+Stage~1 runs on a single H200 GPU on the Tufts research cluster; total wall time is $\sim 7$ minutes per \texttt{2m} job and $\sim 19$ minutes per \texttt{4m} job. Stage~2 is essentially free once $x_u$ is on disk. Stage~3 generation is the bulk of the wall time. Stage~3 evaluation runs on a laptop CPU and is API-free in the v2 version.
+
+\paragraph{Reproducibility.}
+All adversarial images, response pairs, and judge outputs are released on Hugging Face Datasets at \url{huggingface.co/datasets/jeffliulab/visinject}, and the source code is at \url{github.com/jeffliulab/vis-inject}.
