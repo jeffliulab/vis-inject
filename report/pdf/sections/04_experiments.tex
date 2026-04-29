@@ -11,10 +11,11 @@ The full sweep is built out of four orthogonal axes:
   \item \textbf{$7$ target phrases} (\S\ref{sec:exp-prompts})
   \item \textbf{$3$ white-box ensembles} (\S\ref{sec:exp-vlms})
   \item \textbf{$7$ test images} (\S\ref{sec:exp-images})
-  \item \textbf{$45$ benign questions per image} (15 in each of three categories: ``user'', ``agent'', ``screenshot'')
+  \item \textbf{$60$ benign-question pool} (20 each in ``user'', ``agent'', ``screenshot'' categories; full list in Appendix~\ref{app:questions})
+  \item \textbf{$15$ questions per (image, target VLM)} for evaluation: the first 5 of each category
 \end{itemize}
 
-Stage~1 produces $7 \times 3 = 21$ universal adversarial images. Stage~2 fuses each onto each of the $7$ test images, giving $147$ adversarial photos. For each adversarial photo we run all $45$ benign questions on every \emph{applicable} target \vlm{} (BLIP-2 only contributes pairs in ensembles where it appears, etc.), giving $6{,}615$ (clean, adversarial) response pairs. Table~\ref{tab:matrix} summarises the multiplicative structure.
+Stage~1 produces $7 \times 3 = 21$ universal adversarial images, with each PGD step sampling one question at random from the full 60-question pool so the universal stays robust across phrasings. Stage~2 fuses each universal onto each of the $7$ test images, giving $147$ adversarial photos. For each adversarial photo we run $15$ evaluation questions on every \emph{applicable} target \vlm{} (BLIP-2 only contributes pairs in ensembles where it appears, etc.), giving $6{,}615$ (clean, adversarial) response pairs total. Table~\ref{tab:matrix} summarises the multiplicative structure.
 
 \begin{table}[h]
   \centering
@@ -25,7 +26,7 @@ Stage~1 produces $7 \times 3 = 21$ universal adversarial images. Stage~2 fuses e
     \midrule
     Stage 1 outputs            & $7$ prompts $\times$ $3$ ensembles $\;=\;21$ universal images \\
     Stage 2 outputs            & $21$ universals $\times$ $7$ clean photos $\;=\;147$ adversarial photos \\
-    Stage 3 outputs            & $147$ photos $\times$ $45$ questions $\times$ applicable VLMs $\;=\;6\,615$ pairs \\
+    Stage 3 outputs            & $7 \!\times\! 7 \!\times\! (2{+}3{+}4)$ ensemble-VLM slots $\!\times\! 15$ questions $\;=\;6\,615$ pairs \\
     \bottomrule
   \end{tabular}
   \caption{The full design matrix. Compute: each Stage-1 run is $\sim 7$~min (\texttt{2m}) -- $\sim 19$~min (\texttt{4m}) on a single H200; Stage~2 is essentially free; Stage~3 generation is the bulk of wall-clock time.}
@@ -127,7 +128,7 @@ Concretely, one row of the sweep (e.g.\ ``\texttt{url} target, \texttt{3m} ensem
 \begin{enumerate}
   \item \textbf{Stage 1 --- universal training} ($7$--$19$~min on H200). Load the surrogate \vlm{}s, run $2{,}000$ PGD steps with the multi-prompt loss against the target phrase, write \texttt{universal\_<hash>.png}.
   \item \textbf{Stage 2 --- fusion onto each clean photo} (seconds per photo). Encode the universal via CLIP, decode through AnyAttack to \eps{}-bounded noise, add to each \texttt{ORIGIN\_*.png}, write \texttt{adv\_url\_3m\_ORIGIN\_<image>.png} for each of the $7$ test images.
-  \item \textbf{Stage 3a --- response-pair generation} ($\sim 30$~min per (experiment, image)). For each adversarial photo and its clean baseline, run all $45$ benign questions on every applicable evaluation \vlm{}. Write \texttt{response\_pairs\_ORIGIN\_<image>.json}.
+  \item \textbf{Stage 3a --- response-pair generation} ($\sim 30$~min per (experiment, image)). For each adversarial photo and its clean baseline, run $15$ benign questions (5 user + 5 agent + 5 screenshot from Appendix~\ref{app:questions}) on every applicable evaluation \vlm{}; write the resulting (clean, adversarial) response pairs as JSON.
   \item \textbf{Stage 3b --- dual-dim judge} ($\sim 5$~min per file, no GPU, no API cost). Score Output Affected and Target Injected for every pair. Write \texttt{judge\_results\_ORIGIN\_<image>.json}.
 \end{enumerate}
 
