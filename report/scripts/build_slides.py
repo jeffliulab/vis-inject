@@ -301,7 +301,7 @@ def slide_footer(slide):
     )
     add_text(
         slide, SLIDE_W - Inches(4.0) - MARGIN, SLIDE_H - Inches(0.42), Inches(4), Inches(0.3),
-        "Final Project Report  •  v1.1",
+        "EE141 Final Report  •  April 2026",
         size=9, color=SUBINK, align=PP_ALIGN.RIGHT,
     )
 
@@ -355,7 +355,7 @@ def slide_1_title():
     )
     add_text(
         slide, MARGIN + Inches(0.2), Inches(3.65), Inches(11), Inches(0.4),
-        "EE141 Final Report  •  v1.1",
+        "EE141 Final Report",
         size=14, color=SUBINK,
     )
 
