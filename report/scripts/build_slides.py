@@ -55,7 +55,7 @@ AMBER = RGBColor(0xC9, 0x7B, 0x12)
 
 FONT = "Helvetica"
 
-TOTAL_SLIDES = 23
+TOTAL_SLIDES = 25
 
 # ---------------------------------------------------------------------------
 # Slide dimensions
@@ -1354,14 +1354,106 @@ def slide_15_per_vlm():
 
 
 # ---------------------------------------------------------------------------
-# Slide 14 — Results: per-prompt × per-image
+# Slide 16 — Why BLIP-2 stays at 0% (analysis of the surprising immunity)
 # ---------------------------------------------------------------------------
-def slide_16_per_prompt_image():
+def slide_16_blip_immunity():
+    slide = blank_slide()
+    section_label(slide, "Results  •  Analysis")
+    slide_header(slide, "Why BLIP-2 Stays at 0%",
+                 "BLIP-2 is in the training ensemble — yet completely immune. Where does the signal die?",
+                 page=16)
+
+    # Top: the puzzle / framing strip
+    fr_y = Inches(1.85)
+    add_rect(slide, MARGIN, fr_y, SLIDE_W - 2 * MARGIN, Inches(0.8),
+             fill=CARD, radius=0.04)
+    add_rect(slide, MARGIN, fr_y, Inches(0.06), Inches(0.8), fill=AMBER)
+    add_text(slide, MARGIN + Inches(0.20), fr_y + Inches(0.10),
+             SLIDE_W - 2 * MARGIN - Inches(0.4), Inches(0.3),
+             "The puzzle", size=12, color=NAVY, bold=True)
+    add_text(slide, MARGIN + Inches(0.20), fr_y + Inches(0.40),
+             SLIDE_W - 2 * MARGIN - Inches(0.4), Inches(0.4),
+             "Stage 1's loss explicitly minimises  CE(BLIP-2(x_u, prompt), y*)  — yet at evaluation time BLIP-2 "
+             "scores 0/2 205 affected pairs.  Which step in the pipeline kills the signal that should reach BLIP-2?",
+             size=11, color=SUBINK, line_spacing=1.2)
+
+    # Three candidate causes as side-by-side cards
+    top = fr_y + Inches(1.0)
+    col_w = (SLIDE_W - 2 * MARGIN - Inches(0.6)) / 3
+    h = Inches(3.4)
+
+    cards = [
+        ("#1  Stage 2 fusion strips it",
+         RED,
+         "MOST LIKELY",
+         "Stage 1 trains the universal image $x_u$ — but Stage 3 evaluates "
+         "$x_a = $ clean $+$ AnyAttack-decoder($x_u$).\n\n"
+         "AnyAttack's encoder-decoder is pretrained on COCO bidirectionally — "
+         "its noise pattern targets transformer-style VLMs, not BLIP-2's "
+         "Q-Former. Whatever \"attack BLIP-2\" signal $x_u$ encodes gets "
+         "filtered out during the CLIP-encode → decode step."),
+        ("#2  Resolution + Q-Former double bottleneck",
+         AMBER,
+         "Architectural",
+         "Pipeline runs at 448×448; BLIP-2 needs 224×224. Wrapper does "
+         "bilinear 448→224 — each output pixel averages 4 inputs, smoothing "
+         "out fine ε-bounded structure.\n\n"
+         "The Q-Former then compresses the entire image into 32 query "
+         "tokens before reaching the frozen OPT decoder. A real information "
+         "bottleneck."),
+        ("#3  Gradient dilution in Stage 1",
+         NAVY,
+         "Optimisation",
+         "Stage 1 loss is  $\\sum_i$ loss$_i$  across surrogates. The "
+         "Q-Former's bottleneck shrinks BLIP-2's backward gradient relative "
+         "to Qwen / DeepSeek.\n\n"
+         "The PGD optimizer effectively follows the Qwen-favoring direction; "
+         "BLIP-2-relevant updates are sacrificed."),
+    ]
+    for i, (head, accent, tag, body) in enumerate(cards):
+        x = MARGIN + i * (col_w + Inches(0.3))
+        add_rect(slide, x, top, col_w, h, fill=CARD, radius=0.05)
+        add_rect(slide, x, top, col_w, Inches(0.55), fill=accent, radius=0.05)
+        add_text(slide, x + Inches(0.25), top + Inches(0.08),
+                 col_w - Inches(1.4), Inches(0.4),
+                 head, size=13, color=WHITE, bold=True)
+        add_text(slide, x + col_w - Inches(1.3), top + Inches(0.10),
+                 Inches(1.1), Inches(0.35),
+                 tag, size=9, color=WHITE, italic=True, bold=True,
+                 align=PP_ALIGN.RIGHT)
+        add_text(slide, x + Inches(0.25), top + Inches(0.7),
+                 col_w - Inches(0.5), h - Inches(0.85),
+                 body, size=11, color=SUBINK, line_spacing=1.25)
+
+    # Bottom: how to verify + payoff link
+    bot_y = top + h + Inches(0.2)
+    add_rect(slide, MARGIN, bot_y, SLIDE_W - 2 * MARGIN, Inches(0.85),
+             fill=CARD, radius=0.04)
+    add_rect(slide, MARGIN, bot_y, Inches(0.06), Inches(0.85), fill=GREEN)
+    add_text(slide, MARGIN + Inches(0.20), bot_y + Inches(0.08),
+             SLIDE_W - 2 * MARGIN - Inches(0.4), Inches(0.3),
+             "Cheap ablation that would tell us which one (v2 future work)",
+             size=12, color=NAVY, bold=True)
+    add_text(slide, MARGIN + Inches(0.20), bot_y + Inches(0.40),
+             SLIDE_W - 2 * MARGIN - Inches(0.4), Inches(0.45),
+             "Feed $x_u$ DIRECTLY to BLIP-2 (skipping Stage 2). "
+             "If BLIP-2 reacts → Stage 2 fusion is the culprit (#1).  "
+             "If BLIP-2 still doesn't react → gradient dilution (#3) dominates.  "
+             "Either way, this finding motivates v2 defense D2 — port the Q-Former bottleneck onto Qwen.",
+             size=11, color=SUBINK, line_spacing=1.2)
+
+    slide_footer(slide)
+
+
+# ---------------------------------------------------------------------------
+# Slide 17 — Results: per-prompt × per-image
+# ---------------------------------------------------------------------------
+def slide_17_per_prompt_image():
     slide = blank_slide()
     section_label(slide, "Results")
     slide_header(slide, "Per-Prompt × Per-Image",
                  "Disruption is uniform.  Injection lands on screenshots.",
-                 page=16)
+                 page=17)
 
     # Two side-by-side tables
     col_w = (SLIDE_W - 2 * MARGIN - Inches(0.5)) / 2
@@ -1437,11 +1529,11 @@ def _draw_table(slide, x, y, total_w, rows, *, col_widths, mono_col=None):
 # ---------------------------------------------------------------------------
 # Slide 15 — Results: Confirmed / Partial / Weak summary
 # ---------------------------------------------------------------------------
-def slide_17_summary():
+def slide_18_summary():
     slide = blank_slide()
     section_label(slide, "Results")
     slide_header(slide, "Injection Summary",
-                 "10 cases out of 6 615 — and they cluster.", page=17)
+                 "10 cases out of 6 615 — and they cluster.", page=18)
 
     # Three colored cards (one per level)
     top = Inches(1.85)
@@ -1490,13 +1582,13 @@ def slide_17_summary():
 # ---------------------------------------------------------------------------
 # Slide 16 — Case A: URL injection (confirmed)
 # ---------------------------------------------------------------------------
-def slide_18_case_url():
+def slide_19_case_url():
     entry = manifest_entry("url_3m_ORIGIN_code_qwen2_5_vl_3b")
     slide = blank_slide()
     section_label(slide, "Case Study A")
     slide_header(slide, "Case A — URL Injection (Confirmed)",
                  "Reproduced verbatim on configurations 3m AND 4m.",
-                 page=18)
+                 page=19)
 
     # Experiment metadata strip — directly under the header
     meta_y = Inches(1.55)
@@ -1609,13 +1701,13 @@ def slide_18_case_url():
 # ---------------------------------------------------------------------------
 # Slide 17 — Case B: Card injection (partial)
 # ---------------------------------------------------------------------------
-def slide_19_case_card():
+def slide_20_case_card():
     entry = manifest_entry("card_3m_ORIGIN_bill_deepseek_vl_1_3b")
     slide = blank_slide()
     section_label(slide, "Case Study B")
     slide_header(slide, "Case B — Payment-Info Injection (Partial)",
                  "Literal phrase is gone — but the semantic class slipped through.",
-                 page=19)
+                 page=20)
 
     # Experiment metadata strip
     meta_y = Inches(1.55)
@@ -1728,12 +1820,12 @@ def slide_19_case_card():
 # ---------------------------------------------------------------------------
 # Slide 18 — Cross-model transferability
 # ---------------------------------------------------------------------------
-def slide_20_transfer():
+def slide_21_transfer():
     slide = blank_slide()
     section_label(slide, "Transferability")
     slide_header(slide, "Does It Transfer to GPT-4o?",
                  "We took the strongest small-model case and tried it on a frontier closed model.",
-                 page=20)
+                 page=21)
 
     col_w = (SLIDE_W - 2 * MARGIN - Inches(0.6)) / 2
     top = Inches(1.85)
@@ -1789,54 +1881,72 @@ def slide_20_transfer():
 # ---------------------------------------------------------------------------
 # Slide 19 — HF Dataset as a project output
 # ---------------------------------------------------------------------------
-def slide_21_hf_dataset():
+def slide_22_hf_dataset():
     slide = blank_slide()
     section_label(slide, "Project Output")
     slide_header(slide, "HuggingFace Dataset",
                  "huggingface.co/datasets/jeffliulab/visinject  •  300+ downloads / month",
-                 page=21)
+                 page=22)
 
-    # Left: contents card
-    col_w = (SLIDE_W - 2 * MARGIN - Inches(0.5)) / 2
-    top = Inches(1.85)
+    # Layout reworked: HF screenshot on the right with KNOWN HEIGHT, two
+    # bullet groups stacked on the left, both fitting inside the body band.
+    body_top = Inches(1.85)
+    body_bot = SLIDE_H - Inches(0.55)               # leave footer alone
+    body_h   = body_bot - body_top                  # ~5.10 in
 
-    add_text(slide, MARGIN, top, col_w, Inches(0.4),
-             "What's inside", size=14, color=NAVY, bold=True)
-    add_bullets(slide, MARGIN, top + Inches(0.45), col_w, Inches(2.6),
+    # Right column: HF screenshot card with bounded height + bottom caption
+    rw = Inches(4.6)
+    rx = SLIDE_W - MARGIN - rw
+
+    rcard_h = body_h                                # fill the body
+    add_rect(slide, rx, body_top, rw, rcard_h, fill=CARD, radius=0.04)
+    # Header strip
+    add_rect(slide, rx, body_top, rw, Inches(0.5), fill=NAVY, radius=0.04)
+    add_text(slide, rx + Inches(0.25), body_top + Inches(0.08),
+             rw - Inches(0.5), Inches(0.35),
+             "Downloads — HuggingFace stats",
+             size=13, color=WHITE, bold=True)
+    # Constrain the screenshot to a fixed height that leaves room for caption
+    img_top = body_top + Inches(0.7)
+    img_h   = Inches(2.6)
+    add_image(slide, HF_PNG, rx + Inches(0.30), img_top,
+              height=img_h)
+    # Caption sits well below the image, inside the card
+    cap_top = img_top + img_h + Inches(0.20)
+    add_text(slide, rx + Inches(0.25), cap_top,
+             rw - Inches(0.5), Inches(0.6),
+             "≈ 300 downloads in the first month — a tangible deliverable "
+             "beyond the course report itself.",
+             size=11, color=SUBINK, italic=True,
+             align=PP_ALIGN.CENTER, line_spacing=1.2)
+
+    # Left column: stacked bullet groups, sized to fit
+    col_w = SLIDE_W - 2 * MARGIN - rw - Inches(0.4)
+    cur_y = body_top
+    # Group 1
+    add_text(slide, MARGIN, cur_y, col_w, Inches(0.35),
+             "What's inside the dataset", size=13, color=NAVY, bold=True)
+    cur_y += Inches(0.40)
+    add_bullets(slide, MARGIN, cur_y, col_w, Inches(2.05),
                 [
                     "21 universal adversarial images (one per prompt × ensemble).",
-                    "147 (clean, adversarial) photo pairs (PSNR ~25 dB on every pair).",
-                    "6 615 response_pairs JSON entries with v2 dual-dim judge scores.",
-                    "12 curated injection examples (4 clean + 8 adv) with manifest.",
-                    "Dataset Card: setup, threat model, evaluation, citation.",
-                ], size=12)
-
-    add_text(slide, MARGIN, top + Inches(3.25), col_w, Inches(0.4),
-             "Why a researcher would download it", size=14, color=NAVY, bold=True)
-    add_bullets(slide, MARGIN, top + Inches(3.7), col_w, Inches(2.4),
+                    "147 (clean, adversarial) photo pairs at PSNR ≈ 25 dB.",
+                    "6 615 response pairs with dual-dim judge scores.",
+                    "12 curated injection examples + manifest.",
+                    "Dataset Card: setup, threat model, evaluation.",
+                ], size=11, line_spacing=1.20)
+    cur_y += Inches(2.10)
+    # Group 2
+    add_text(slide, MARGIN, cur_y, col_w, Inches(0.35),
+             "Why a researcher would download it", size=13, color=NAVY, bold=True)
+    cur_y += Inches(0.40)
+    add_bullets(slide, MARGIN, cur_y, col_w, Inches(1.65),
                 [
-                    "First publicly-shared multi-VLM × multi-prompt adv-image set built "
-                    "on top of two well-known papers.",
+                    "First public multi-VLM × multi-prompt adv-image set built on top of two well-known papers.",
                     "Curated success cases save reviewers hours of triage.",
                     "Plug-and-play: bring a new VLM, run our judge, get a number.",
-                    "Reproducible: weights are pretrained (`coco_bi.pt`), no large training cost.",
-                ], size=12)
-
-    # Right: HF downloads screenshot
-    rx = MARGIN + col_w + Inches(0.5)
-    rw = SLIDE_W - rx - MARGIN
-    add_rect(slide, rx, top, rw, Inches(5.0), fill=CARD, radius=0.05)
-    add_rect(slide, rx, top, rw, Inches(0.5), fill=NAVY, radius=0.05)
-    add_text(slide, rx + Inches(0.25), top + Inches(0.08),
-             rw - Inches(0.5), Inches(0.4),
-             "Downloads (HuggingFace stats)", size=14, color=WHITE, bold=True)
-    add_image(slide, HF_PNG, rx + Inches(0.25), top + Inches(0.7),
-              width=rw - Inches(0.5))
-    add_text(slide, rx + Inches(0.25), top + Inches(4.25),
-             rw - Inches(0.5), Inches(0.6),
-             "300+ downloads in the first month — a tangible deliverable beyond the "
-             "course report itself.", size=11, color=SUBINK, italic=True,
-             align=PP_ALIGN.CENTER)
+                    "Reproducible: weights are pretrained (coco_bi.pt), no large training cost.",
+                ], size=11, line_spacing=1.20)
 
     slide_footer(slide)
 
@@ -1844,12 +1954,12 @@ def slide_21_hf_dataset():
 # ---------------------------------------------------------------------------
 # Slide 20 — Future Work: VisInject v2 attacks
 # ---------------------------------------------------------------------------
-def slide_22_future_attacks():
+def slide_23_future_attacks():
     slide = blank_slide()
     section_label(slide, "Future Work  •  VisInject v2")
     slide_header(slide, "v2 — Five Attack Categories",
                  "C1 (this report) is just one point in a wider design space.",
-                 page=22)
+                 page=23)
 
     rows = [
         ("Tag", "Category",            "Idea",                                                                         "Status"),
@@ -1904,12 +2014,12 @@ def slide_22_future_attacks():
 # ---------------------------------------------------------------------------
 # Slide 21 — Future Work: defenses + roadmap + closing
 # ---------------------------------------------------------------------------
-def slide_23_future_defenses():
+def slide_24_future_defenses():
     slide = blank_slide()
     section_label(slide, "Future Work  •  VisInject v2")
     slide_header(slide, "v2 — Defenses, Closed-Model Tests & Roadmap",
                  "What turns this from one attack into an attack-defense study.",
-                 page=23)
+                 page=24)
 
     # Three defense cards
     top = Inches(1.85)
@@ -1966,12 +2076,40 @@ def slide_23_future_defenses():
                  box_w - Inches(0.25), Inches(0.5),
                  name, size=10, color=SUBINK, line_spacing=1.1)
 
-    # Closing
-    add_text(slide, MARGIN, Inches(6.65), SLIDE_W - 2 * MARGIN, Inches(0.4),
-             "Thank you  •  Questions?",
-             size=18, color=NAVY, bold=True, italic=True, align=PP_ALIGN.CENTER)
-
     slide_footer(slide)
+
+
+# ---------------------------------------------------------------------------
+# Slide 25 — Thanks & Questions (standalone closing slide)
+# ---------------------------------------------------------------------------
+def slide_25_thanks():
+    slide = blank_slide()
+    # Thin navy strip on the left as the only ornament (matches title slide).
+    add_rect(slide, Inches(0), Inches(2.6), Inches(0.18), Inches(2.3), fill=NAVY)
+
+    # Big "Thank you" + "Questions?" stacked
+    add_text(slide, MARGIN + Inches(0.2), Inches(2.55),
+             SLIDE_W - 2 * MARGIN, Inches(1.0),
+             "Thank you.", size=64, color=NAVY, bold=True)
+    add_text(slide, MARGIN + Inches(0.2), Inches(3.55),
+             SLIDE_W - 2 * MARGIN, Inches(0.8),
+             "Questions?", size=44, color=INK, italic=True)
+
+    # Author + course on the bottom
+    add_line(slide, MARGIN + Inches(0.2), Inches(5.0),
+             MARGIN + Inches(4.0), Inches(5.0), color=NAVY, weight=1.0)
+    add_text(slide, MARGIN + Inches(0.2), Inches(5.15),
+             SLIDE_W - 2 * MARGIN, Inches(0.4),
+             "Pang Liu  ·  pang.liu@tufts.edu",
+             size=14, color=INK)
+    add_text(slide, MARGIN + Inches(0.2), Inches(5.55),
+             SLIDE_W - 2 * MARGIN, Inches(0.4),
+             "EE141 Final Report  ·  April 2026",
+             size=12, color=SUBINK)
+    add_text(slide, MARGIN, SLIDE_H - Inches(0.5), SLIDE_W - 2 * MARGIN, Inches(0.3),
+             "Code: github.com/jeffliulab/vis-inject  ·  "
+             "Dataset: huggingface.co/datasets/jeffliulab/visinject",
+             size=10, color=SUBINK)
 
 
 # ---------------------------------------------------------------------------
@@ -1994,14 +2132,16 @@ def main():
         slide_13_process,
         slide_14_results_headline,
         slide_15_per_vlm,
-        slide_16_per_prompt_image,
-        slide_17_summary,
-        slide_18_case_url,
-        slide_19_case_card,
-        slide_20_transfer,
-        slide_21_hf_dataset,
-        slide_22_future_attacks,
-        slide_23_future_defenses,
+        slide_16_blip_immunity,
+        slide_17_per_prompt_image,
+        slide_18_summary,
+        slide_19_case_url,
+        slide_20_case_card,
+        slide_21_transfer,
+        slide_22_hf_dataset,
+        slide_23_future_attacks,
+        slide_24_future_defenses,
+        slide_25_thanks,
     ]
     assert len(builders) == TOTAL_SLIDES, (
         f"Expected {TOTAL_SLIDES} builders, got {len(builders)}"
