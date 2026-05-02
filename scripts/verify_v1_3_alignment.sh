@@ -48,7 +48,11 @@ check "agreement_report.json verdict pass" ".venv/bin/python -c \"import json; d
 echo
 echo "── C. Judge cache exists and is non-trivial ──"
 check "outputs/judge_cache.json exists" "test -s outputs/judge_cache.json"
-check "judge_cache has all 6,615 entries" ".venv/bin/python -c \"import json; d=json.loads(open('outputs/judge_cache.json').read()); n=len(d['calls']); assert n>=6615, f'cache only has {n} entries'\""
+# Cache has fewer than 6615 unique entries because BLIP-2 echo cases (clean=adv=question)
+# share cache keys across 2m/3m/4m configs. The right check is that replay covers all 147
+# files with no missing entries — done in section H.
+check "judge_cache has at least 4000 unique entries" ".venv/bin/python -c \"import json; d=json.loads(open('outputs/judge_cache.json').read()); n=len(d['calls']); assert n>=4000, f'cache only has {n} entries'\""
+check "judge_cache covers all 147 experiments via replay (no missing)" ".venv/bin/python -m evaluate.replay --cache outputs/judge_cache.json --pairs-dir /tmp/visinject-judge/experiments --output-dir /tmp/v3-replay-check --strict 2>&1 | grep -q 'wrote 147 judge_results files'"
 
 echo
 echo "── D. Old (v2) numbers should not appear in new artefacts ──"
