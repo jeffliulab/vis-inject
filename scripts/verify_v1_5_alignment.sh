@@ -1,5 +1,5 @@
 #!/bin/bash
-# verify_v1_3_alignment.sh — Phase 15 of the v1.3 upgrade.
+# verify_v1_3_alignment.sh — Phase 15 of the v1.5 upgrade.
 #
 # Cross-checks alignment between code, paper, dataset, slides, Space.
 # Run from project root. Returns non-zero on any failure.
@@ -27,7 +27,7 @@ check() {
     fi
 }
 
-echo "=== v1.3 alignment verification ==="
+echo "=== v1.5 alignment verification ==="
 echo
 
 echo "── A. Code: judge module imports cleanly ──"
@@ -56,7 +56,7 @@ check "judge_cache covers all 147 experiments via replay (no missing)" ".venv/bi
 
 echo
 echo "── D. Old (v2) numbers should not appear in new artefacts ──"
-# These v2-specific values should NOT appear as headline figures in v1.3 artefacts
+# These v2-specific values should NOT appear as headline figures in v1.5 artefacts
 for tex_file in report/pdf/sections/03_method.tex report/pdf/sections/05_results.tex; do
     if test -f "$tex_file"; then
         check "$tex_file: no 'longest-common-subsequence drift'" "! grep -q 'longest-common-subsequence drift' '$tex_file'"
@@ -71,8 +71,8 @@ check "RESULTS_SCHEMA.md mentions deepseek-v4-pro" "grep -q 'deepseek-v4-pro' do
 check "RESULTS_SCHEMA.md mentions cache replay" "grep -q 'evaluate.replay' docs/RESULTS_SCHEMA.md"
 
 echo
-echo "── F. v1.3 plan file exists ──"
-check "1.3升级计划.md exists" "test -s 1.3升级计划.md"
+echo "── F. v1.5 plan file exists ──"
+check "1.5升级计划.md exists" "test -s 1.5升级计划.md"
 
 echo
 echo "── G. config.py is consistent ──"

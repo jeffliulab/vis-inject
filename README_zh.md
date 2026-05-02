@@ -1,10 +1,10 @@
 [![Language: English](https://img.shields.io/badge/Language-English-2f81f7?style=flat-square)](README.md) [![语言: 简体中文](https://img.shields.io/badge/语言-简体中文-e67e22?style=flat-square)](README_zh.md)
 
-# VisInject v1.3
+# VisInject v1.5
 
 **针对视觉语言模型的对抗性提示注入** — 将不可见的提示嵌入图片像素，使 VLM 在用户正常提问时输出攻击者指定的内容。
 
-[![Version](https://img.shields.io/badge/version-v1.3-blue?style=flat-square)]() [![Python](https://img.shields.io/badge/python-3.10+-green?style=flat-square)]() [![License: Research](https://img.shields.io/badge/license-Research%20Only-red?style=flat-square)]()
+[![Version](https://img.shields.io/badge/version-v1.5-blue?style=flat-square)]() [![Python](https://img.shields.io/badge/python-3.10+-green?style=flat-square)]() [![License: Research](https://img.shields.io/badge/license-Research%20Only-red?style=flat-square)]()
 
 [![🤗 Space](https://img.shields.io/badge/%F0%9F%A4%97-Space-FFD21E?style=flat-square&labelColor=000000)](https://huggingface.co/spaces/jeffliulab/visinject) [![🤗 Dataset](https://img.shields.io/badge/%F0%9F%A4%97-Dataset-FFD21E?style=flat-square&labelColor=000000)](https://huggingface.co/datasets/jeffliulab/visinject)
 
@@ -12,7 +12,7 @@
 
 ## 核心发现
 
-- **三阶段攻击流水线**：PGD 像素优化 → CLIP+Decoder 融合 → **双轴 LLM judge**（v1.3）
+- **三阶段攻击流水线**：PGD 像素优化 → CLIP+Decoder 融合 → **双轴 LLM judge**（v1.5）
 - **21 组实验**：7 种攻击目标 × 3 种模型配置，在 7 张图片上评估（共 6,615 组回答对）
 - **核心结论**：对抗图片造成 **~66% 干扰**，但仅有 **0.030% 字面注入 / 0.756% 广义注入** — 攻击是破坏性的，不是建设性的（90× 量级差）
 - **DeepSeek-V4-Pro LLM-as-judge** + cache-replay 复现路径（reviewer 不需要 API key 即可 bit-exact 重现 paper 数字）
@@ -58,7 +58,7 @@
 
 ## 实验结果
 
-### 按 VLM（v1.3 双轴 LLM judge）
+### 按 VLM（v1.5 双轴 LLM judge）
 
 | VLM | 参数量 | 干扰率（程序化）| 干扰率（LLM）| 严格注入 | 强注入 | 广义注入 |
 |---|---|---|---|---|---|---|

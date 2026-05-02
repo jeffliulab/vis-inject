@@ -1,5 +1,5 @@
 """
-Build the v1.3 evaluator_manifest.json for the HF Dataset.
+Build the v1.5 evaluator_manifest.json for the HF Dataset.
 
 This file is the reproducibility 'contract' shipped with the dataset:
 exact model snapshot, rubric SHA-256, calibration κ, ε threshold values,

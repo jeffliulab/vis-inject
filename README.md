@@ -1,10 +1,10 @@
 [![Language: English](https://img.shields.io/badge/Language-English-2f81f7?style=flat-square)](README.md) [![语言: 简体中文](https://img.shields.io/badge/语言-简体中文-e67e22?style=flat-square)](README_zh.md)
 
-# VisInject v1.3
+# VisInject v1.5
 
 **Adversarial prompt injection for Vision-Language Models** — embed invisible prompts into image pixels so VLMs output attacker-specified content when users ask normal questions.
 
-[![Version](https://img.shields.io/badge/version-v1.3-blue?style=flat-square)]() [![Python](https://img.shields.io/badge/python-3.10+-green?style=flat-square)]() [![License: Research](https://img.shields.io/badge/license-Research%20Only-red?style=flat-square)]()
+[![Version](https://img.shields.io/badge/version-v1.5-blue?style=flat-square)]() [![Python](https://img.shields.io/badge/python-3.10+-green?style=flat-square)]() [![License: Research](https://img.shields.io/badge/license-Research%20Only-red?style=flat-square)]()
 
 [![🤗 Space](https://img.shields.io/badge/%F0%9F%A4%97-Space-FFD21E?style=flat-square&labelColor=000000)](https://huggingface.co/spaces/jeffliulab/visinject) [![🤗 Dataset](https://img.shields.io/badge/%F0%9F%A4%97-Dataset-FFD21E?style=flat-square&labelColor=000000)](https://huggingface.co/datasets/jeffliulab/visinject)
 
@@ -12,7 +12,7 @@
 
 ## Highlights
 
-- **Three-stage pipeline**: PGD pixel optimization → CLIP+Decoder fusion → **dual-axis LLM judge** (v1.3)
+- **Three-stage pipeline**: PGD pixel optimization → CLIP+Decoder fusion → **dual-axis LLM judge** (v1.5)
 - **21 experiments**: 7 attack prompts × 3 model configs, evaluated on 7 images (6,615 response pairs)
 - **Key finding**: adversarial images cause **~66% disruption** but only **0.030% verbatim / 0.756% broad injection** — attacks are destructive, not constructive (90× gap)
 - **DeepSeek-V4-Pro LLM-as-judge** with cache-replay reproducibility (no API key required to reproduce paper numbers)
@@ -58,7 +58,7 @@ Universal adversarial image (448×448)   Embedding → Decoder →             A
 
 ## Key Results
 
-### By VLM (v1.3 dual-axis LLM judge)
+### By VLM (v1.5 dual-axis LLM judge)
 
 | VLM | Params | Disruption (prog.) | Disruption (LLM) | Strict Inj. | Strong Inj. | Broad Inj. |
 |-----|--------|---|---|---|---|---|

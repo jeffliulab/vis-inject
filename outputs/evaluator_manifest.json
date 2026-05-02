@@ -1,6 +1,6 @@
 {
   "schema_version": "v3",
-  "release_date": "2026-05-01",
+  "release_date": "2026-05-02",
   "judge": {
     "axis_a_name": "Influence",
     "axis_a_levels": [
@@ -101,7 +101,7 @@
     "upgrade_plan": "https://github.com/jeffliulab/vis-inject/blob/main/1.3升级计划.md"
   },
   "stats_at_release": {
-    "judge_cache_entries": 346,
+    "judge_cache_entries": 2784,
     "expected_total_pairs": 6615
   }
 }
