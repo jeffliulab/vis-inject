@@ -1,0 +1,16 @@
+\section{Ethics and Responsible Disclosure}
+\label{sec:ethics}
+
+The work described in this paper releases adversarial images, attack code, and a public dataset. We summarise our reasoning for releasing rather than withholding, and the disclosure path we followed.
+
+\paragraph{Scope of release.}
+The released artifacts target four small open-source \vlm{}s (Qwen2.5-VL-3B, Qwen2-VL-2B, DeepSeek-VL-1.3B, BLIP-2-OPT-2.7B). Adversarial images are produced under an $\Linf = 16/255$ budget that is publicly documented in prior universal-attack work (\citet{rahmatullaev2025universal,zhang2025anyattack}). The pipeline reuses the public \texttt{coco\_bi.pt} weights of \textsc{AnyAttack} without retraining. We do not release any new model weights or training data beyond the curated injection examples already present in the dataset.
+
+\paragraph{Why open release.}
+The central empirical finding of this paper is a \emph{negative} one: literal injection rates on small open VLMs are $\sim 0.2\%$, well below what existing universal-attack ASR numbers would suggest. Releasing the data is what allows independent groups to verify (or refute) the claim, and to plug new VLMs into the same dual-axis evaluation. Withholding the artifacts would leave the methodology critique unverifiable. Public release also matches the precedent set by the comparable benchmarks we cite (\textsc{HarmBench}, \textsc{JailbreakBench}, \textsc{MM-SafetyBench}).
+
+\paragraph{Frontier-model exposure.}
+A single manual test on GPT-4o (\S\ref{sec:discussion}) shows that the strongest small-VLM literal injection in our sweep does not transfer: GPT-4o describes the image as containing distortion artefacts and recovers the original content. The session was conducted through the public ChatGPT web UI; the raw transcript was not retained, so the test stands as a single suggestive negative result rather than a logged measurement, and we acknowledge it cannot be re-derived from artifacts in this submission. We have not contacted any frontier-model provider with a disclosure report on this basis. The attack as constructed in this paper is not effective against deployed frontier systems, and we have no evidence of a vector that requires private disclosure. Future systematic transferability work (\S\ref{sec:conclusion}) would change this calculus.
+
+\paragraph{Misuse considerations.}
+The released dataset contains images that, if uploaded to a deployed Qwen-style VLM, can produce off-topic responses approximately $66\%$ of the time but plant the attacker's chosen literal phrase only $\sim 0.2\%$ of the time. The misuse value is therefore low: an attacker seeking reliable payload delivery would find the success rate uncompetitive with cheaper non-adversarial channels (typographic injection, social engineering). The artifacts are most useful for defenders building VLM-input filters and for researchers replicating or extending the methodology.

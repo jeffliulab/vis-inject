@@ -1,0 +1,85 @@
+\section*{NeurIPS Paper Checklist}
+
+\begin{enumerate}
+
+\item {\bf Claims}
+    \item[] Question: Do the main claims made in the abstract and introduction accurately reflect the paper's contributions and scope?
+    \item[] Answer: \answerYes{}
+    \item[] Justification: The abstract and \S\ref{sec:intro} state two empirical claims --- a $\sim\!90\times$ disruption-vs-injection gap on $6{,}615$ pairs and BLIP-2's zero detectable drift across $2{,}205$ pairs --- and a methodological claim (dual-axis evaluation with cache-replay reproducibility). All three are quantified in \S\ref{sec:results} and Appendix~\ref{app:repro} with the same numbers; no claim made in the abstract appears without a corresponding measured result in the body.
+
+\item {\bf Limitations}
+    \item[] Question: Does the paper discuss the limitations of the work performed by the authors?
+    \item[] Answer: \answerYes{}
+    \item[] Justification: \S\ref{sec:discussion} contains a dedicated ``Limitations'' subsection that flags (i) the small white-box ensemble (four open \vlm{}s, $\leq 4$B params), (ii) the keyword-shaped programmatic Target-Injected baseline check that may miss soft paraphrases, and (iii) the GPT-4o transfer test being a single sample on the strongest case. Appendix~\ref{app:repro} additionally includes a section-by-section anti-fragility audit (\S C.11) that anticipates and addresses methodological objections.
+
+\item {\bf Theory assumptions and proofs}
+    \item[] Question: For each theoretical result, does the paper provide the full set of assumptions and a complete (and correct) proof?
+    \item[] Answer: \answerNA{}
+    \item[] Justification: The paper presents an empirical study and a methodological evaluation framework. It contains no formal theorems and makes no theoretical claims that would require proof.
+
+\item {\bf Experimental result reproducibility}
+    \item[] Question: Does the paper fully disclose all the information needed to reproduce the main experimental results of the paper to the extent that it affects the main claims and/or conclusions of the paper (regardless of whether the code and data are provided or not)?
+    \item[] Answer: \answerYes{}
+    \item[] Justification: Appendix~\ref{app:repro} is a complete reproducibility specification: the verbatim DeepSeek call configuration (\S C.2), the verbatim system prompt (\S C.3), the SHA-256 cache-key construction (\S C.4), the position-bias swap mechanism (\S C.5), the calibration $\kappa$ statistics (\S C.6), and three independent reproduction paths (cache replay without API key, API rerun, cross-LLM rejudge). The full $4{,}475$-entry \texttt{judge\_cache.json} is shipped with the released dataset, enabling \emph{bit-exact} replay of every paper number.
+
+\item {\bf Open access to data and code}
+    \item[] Question: Does the paper provide open access to the data and code, with sufficient instructions to faithfully reproduce the main experimental results, as described in supplemental material?
+    \item[] Answer: \answerYes{}
+    \item[] Justification: The dataset is released under CC-BY-4.0 at \url{huggingface.co/datasets/jeffliulab/visinject} (21 universal images, 147 adversarial photos, $6{,}615$ response pairs, dual-axis judge results, the SHA-256-keyed judge cache, the calibration set with both human and LLM labels). The code is released under MIT at \url{github.com/jeffliulab/vis-inject}; \S\ref{sec:method-stage3} and Appendix~\ref{app:repro} document the exact entry points (\texttt{python -m evaluate.replay} for cache replay, \texttt{python -m evaluate.judge} for API rerun).
+
+\item {\bf Experimental setting/details}
+    \item[] Question: Does the paper specify all the training and test details (e.g., data splits, hyperparameters, how they were chosen, type of optimizer) necessary to understand the results?
+    \item[] Answer: \answerYes{}
+    \item[] Justification: \S\ref{sec:method-stage1} gives Stage-1 hyperparameters (Adam, lr~$10^{-2}$, $2{,}000$ PGD steps, image reparameterisation $x = 0.5 + \gamma\tanh(z)$, masked CE loss, $\Linf = 16/255$, $\eps = 16/255$). \S\ref{sec:experiments} enumerates the full $7\times7\times3\times15$ design matrix with every target phrase, test image, surrogate ensemble, and evaluation question category. Appendix~\ref{app:questions} lists all 60 benign questions verbatim. Appendix~\ref{app:repro} pins the judge configuration (DeepSeek-V4-Pro, \texttt{temperature=0}, \texttt{thinking=high}, \texttt{max\_tokens=4096}).
+
+\item {\bf Experiment statistical significance}
+    \item[] Question: Does the paper report error bars suitably and correctly defined or other appropriate information about the statistical significance of the experiments?
+    \item[] Answer: \answerYes{}
+    \item[] Justification: All \vlm{} generation is at \texttt{temperature=0} (greedy decoding, \texttt{do\_sample=False}); pair-level scoring is deterministic on the cache replay path; therefore there is no run-to-run variance to report on the headline rates. For the human-vs-LLM judge calibration we report Cohen's $\kappa$ in four weightings (unweighted, linear, quadratic, binary; Appendix~\ref{app:repro} \S C.6) on $n=100$ random pairs and $n=110$ for the injection axis, exceeding the substantial-agreement thresholds of Landis \& Koch \citeyearpar{landiskoch1977}. Per-VLM and per-prompt sample sizes ($n$ per cell) are reported in every aggregate table.
+
+\item {\bf Experiments compute resources}
+    \item[] Question: For each experiment, does the paper provide sufficient information on the computer resources (type of compute workers, memory, time of execution) needed to reproduce the experiments?
+    \item[] Answer: \answerYes{}
+    \item[] Justification: \S\ref{sec:experiments} reports Stage-1 wall-clock per universal ($7$~min on \texttt{2m} to $19$~min on \texttt{4m}, single H200 80~GB), Stage-2 cost (seconds per photo), and Stage-3a generation cost ($\sim 30$~min per (image, experiment) row). The full 21-job sweep is one SLURM submission per row; the dual-axis judge runs in $\sim 5$~min per file on a CPU on the cache-replay path or $\sim 30$~min total via the DeepSeek API at $\sim\!\$5$. \S\ref{sec:conclusion} summarises hyperparameters in one paragraph.
+
+\item {\bf Code of ethics}
+    \item[] Question: Does the research conducted in the paper conform, in every respect, with the NeurIPS Code of Ethics \url{https://neurips.cc/public/EthicsGuidelines}?
+    \item[] Answer: \answerYes{}
+    \item[] Justification: \S\ref{sec:ethics} (Ethics and Responsible Disclosure) is a dedicated section explaining why open release is appropriate, scoping the released artefacts (four small open \vlm{}s, no new model weights), the misuse-cost analysis, and a statement on the single GPT-4o transfer test. The released attack rate ($\sim 0.2\%$ literal injection) is below what cheaper non-adversarial channels achieve, so the misuse value is low and dual-use risk is bounded.
+
+\item {\bf Broader impacts}
+    \item[] Question: Does the paper discuss both potential positive societal impacts and negative societal impacts of the work performed?
+    \item[] Answer: \answerYes{}
+    \item[] Justification: \S\ref{sec:ethics} covers both. Positive impact: the dataset is the first public release that bundles universal-attack outputs with both Output-Affected and Target-Injected scores per pair, enabling defenders and benchmark authors to plug new \vlm{}s into the same dual-axis evaluation. Negative impact: the released images can produce off-topic responses on small open Qwen-style \vlm{}s on $\sim\!66\%$ of the time but plant the attacker's literal phrase only $\sim\!0.2\%$ of the time; dataset cards and the \texttt{ethics} section document this.
+
+\item {\bf Safeguards}
+    \item[] Question: Does the paper describe safeguards that have been put in place for responsible release of data or models that have a high risk for misuse (e.g., pre-trained language models, image generators, or scraped datasets)?
+    \item[] Answer: \answerYes{}
+    \item[] Justification: \S\ref{sec:ethics} argues the misuse value of the released artefacts is low: the literal injection rate of $\sim 0.2\%$ on small open \vlm{}s is uncompetitive with cheaper non-adversarial channels (typographic injection, social engineering). A single manual transfer test against GPT-4o (\S\ref{sec:discussion}) shows the strongest small-VLM literal injection does not transfer to a deployed frontier model, so the artefacts do not unlock a new vector against production systems. We release no model weights, only attack \emph{outputs} and evaluation scores. The dataset card on HuggingFace mirrors these caveats.
+
+\item {\bf Licenses for existing assets}
+    \item[] Question: Are the creators or original owners of assets (e.g., code, data, models), used in the paper, properly credited and are the license and terms of use explicitly mentioned and properly respected?
+    \item[] Answer: \answerYes{}
+    \item[] Justification: The two upstream attack methods are cited and credited in \S\ref{sec:method-stage1} \citep{rahmatullaev2025universal} and \S\ref{sec:method-stage2} \citep{zhang2025anyattack}. The pretrained \texttt{coco\_bi.pt} weights are reused from the public AnyAttack release without retraining (see \S\ref{sec:method-stage2}). The four open \vlm{}s used as surrogates and targets --- Qwen2.5-VL-3B \citep{bai2025qwen25vl}, Qwen2-VL-2B \citep{wang2024qwen2vl}, DeepSeek-VL-1.3B \citep{lu2024deepseekvl}, BLIP-2-OPT-2.7B \citep{li2023blip2} --- are loaded from their public HuggingFace repositories under their original Apache-2.0 / Tongyi / DeepSeek licences as documented on the model cards.
+
+\item {\bf New assets}
+    \item[] Question: Are new assets introduced in the paper well documented and is the documentation provided alongside the assets?
+    \item[] Answer: \answerYes{}
+    \item[] Justification: The released HuggingFace dataset (CC-BY-4.0) ships with: a Dataset Card describing every artefact, an \texttt{evaluator\_manifest.json} pinning the judge model snapshot + rubric SHA-256 + calibration $\kappa$, the verbatim system prompt, three independent reproduction paths (\S C.1 of Appendix~\ref{app:repro}), a per-pair JSON schema (Appendix~\ref{app:json-example}), and the curated $10$-case injection manifest. The released code at \texttt{github.com/jeffliulab/vis-inject} contains a \texttt{CLAUDE.md} agent guide and per-folder \texttt{README.md} files documenting the pipeline.
+
+\item {\bf Crowdsourcing and research with human subjects}
+    \item[] Question: For crowdsourcing experiments and research with human subjects, does the paper include the full text of instructions given to participants and screenshots, if applicable, as well as details about compensation (if any)?
+    \item[] Answer: \answerNA{}
+    \item[] Justification: The work involves no human subjects and no crowdsourced annotation. The judge calibration of \S C.6 uses two LLMs (DeepSeek-V4-Pro and Claude Opus 4.7), not human raters.
+
+\item {\bf Institutional review board (IRB) approvals or equivalent for research with human subjects}
+    \item[] Question: Does the paper describe potential risks incurred by study participants, whether such risks were disclosed to the subjects, and whether Institutional Review Board (IRB) approvals (or an equivalent approval/review based on the requirements of your country or institution) were obtained?
+    \item[] Answer: \answerNA{}
+    \item[] Justification: No human subjects were involved; no IRB review was required.
+
+\item {\bf Declaration of LLM usage}
+    \item[] Question: Does the paper describe the usage of LLMs if it is an important, original, or non-standard component of the core methods in this research? Note that if the LLM is used only for writing, editing, or formatting purposes and does \emph{not} impact the core methodology, scientific rigor, or originality of the research, declaration is not required.
+    \item[] Answer: \answerYes{}
+    \item[] Justification: An LLM (DeepSeek-V4-Pro \citep{deepseekv3}) is a core component of the dual-axis judge described in \S\ref{sec:method-stage3} and is the source of the headline injection-rate numbers. The exact configuration, the verbatim rubric prompt, the cache-key construction, the position-bias swap mechanism, and the human-equivalent calibration ($n=110$ pairs labelled by Claude Opus 4.7 under a blind protocol) are documented in Appendix~\ref{app:repro}. Writing assistance (LaTeX editing) by an Anthropic Claude model is also disclosed in the acknowledgements; the empirical results, dataset construction, and final claims are the authors' responsibility.
+
+\end{enumerate}

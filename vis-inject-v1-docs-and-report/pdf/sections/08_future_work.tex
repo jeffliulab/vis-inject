@@ -1,0 +1,17 @@
+\section{Future Work --- VisInject v2}
+\label{sec:future}
+
+The v1 pipeline studies one point in a much wider design space: \emph{\eps{}-bounded gradient attacks against small open \vlm{}s}. A v2 plan is partially scoped on the \texttt{v2-dev} branch of the repository; this section describes what it would add.
+
+The current pipeline (labelled C1) is one of five attack families that we want to compare against the same set of \vlm{}s and the same dual-dim evaluation:
+
+\begin{itemize}
+  \item \textbf{C1 -- Pixel-level (this report).} Stage~1 + Stage~2 with $\Linf = 16/255$. Strong drift, weak literal injection.
+  \item \textbf{C2 -- Typographic.} Render the target phrase as semi-transparent text overlaid on the image at a small alpha. No model retraining needed; trivially detectable by OCR but useful as a baseline upper bound for ``what if the payload were just visible''.
+  \item \textbf{C3 -- Steganography.} Embed the target phrase in least-significant-bit or DCT-coefficient channels. Survives ordinary visual inspection; we expect it to be filtered by JPEG re-encoding.
+  \item \textbf{C4 -- Cross-modal.} Image carries part of the payload (typographic or pixel-level), and a paired user prompt is crafted to elicit the rest. Exploits the joint visual-text grounding of \vlm{}s rather than either channel alone.
+  \item \textbf{C5 -- Scene spoofing.} Render fake notification / pop-up / watermark UI elements onto the photo. Targets \vlm{}s that read screenshots and treat any UI text as part of the user request.
+\end{itemize}
+
+\paragraph{Beyond the five attack categories.}
+Three lighter extensions are also on the v2 docket. (i) A small \emph{defense} layer pass --- input preprocessing (JPEG re-encoding, mild blur, OCR detection), porting BLIP-2's Q-Former bottleneck onto Qwen-style \vlm{}s, and a multi-\vlm{} consensus check --- with the goal of producing a $5 \times 3$ attack-defense matrix evaluated by the same dual-axis judge. (ii) A \emph{systematic} closed-model transferability study, replacing this report's single GPT-4o anecdote with a $5\,\text{attacks} \times 3\,\text{cases} \times 2\,\text{frontier models} = 30$-pair sweep against ChatGPT and Gemini. (iii) A short ablation on the BLIP-2 immunity finding --- feeding the Stage-1 universal image $x_u$ directly to BLIP-2 (skipping Stage 2) to disentangle whether the immunity sits in the AnyAttack decoder or in BLIP-2's architecture itself. The complete plan is tracked as five lettered milestones (\texttt{v2.0}--\texttt{v2.5P}) on the \texttt{v2-dev} branch; \texttt{v2.5} is the version we intend to submit as the next iteration of this work.

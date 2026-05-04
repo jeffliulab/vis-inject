@@ -1,0 +1,20 @@
+\section{Introduction}
+\label{sec:intro}
+
+\paragraph{Abstract.}
+Vision-Language Models (\vlm{}s) routinely accept user-supplied images alongside benign text prompts. We ask whether a single image, perceptually indistinguishable from a real photo, can carry hidden instructions that the \vlm{} obeys at inference time. Building on two existing papers --- Universal Adversarial Attack on Aligned Multimodal LLMs \citep{rahmatullaev2025universal} and AnyAttack \citep{zhang2025anyattack} --- we compose a three-stage pipeline (\textsc{VisInject}) that turns one universal adversarial image into a stream of perceptually invisible adversarial photos at PSNR $\approx 25.2$~dB, and we evaluate $6{,}615$ (clean, adversarial) response pairs along two independent axes: \emph{Output Affected} (was the answer disturbed?) and \emph{Target Injected} (did the chosen payload appear?). The dual-axis split shows that broad disruption ($\approx 66\%$) coexists with rare payload delivery ($0.227\%$), and that the few injections that do land cluster on screenshot-like images whose semantics already invite text transcription.
+
+\paragraph{What this report does.}
+This is a course final project; we keep the writing oriented toward analysis rather than novelty. The technical contribution is mostly compositional: we build on two existing papers and add a simple but useful evaluation method. The empirical contribution is a careful breakdown of \emph{where injection actually lands}: we show the full $7 \times 7 \times 3$ design, run it end-to-end, and analyse the gap between disruption and injection that earlier judge-based evaluations had hidden.
+
+\paragraph{Contributions.}
+This report makes four contributions:
+\begin{itemize}
+  \item \textbf{C1.} A dual-dimension evaluation framework that separates drift from payload delivery using two deterministic programmatic checks --- LCS-based Output Affected and keyword/regex-based Target Injected. The evaluation runs end-to-end in $\sim 5$ minutes on a CPU with no LLM in the judge loop. (\S\ref{sec:method-stage3})
+  \item \textbf{C2.} A $6{,}615$-pair systematic sweep over four open \vlm{}s, seven prompts, and seven test images. The two axes diverge by approximately $290\times$ on the same data ($\sim 66\%$ Output Affected vs.\ $0.227\%$ Target Injected), showing that single-number ``ASR'' metrics conflate two qualitatively different failure modes. (\S\ref{sec:results})
+  \item \textbf{C3.} An architecture finding: BLIP-2's Q-Former bottleneck is fully immune ($0/2{,}205$ pairs affected) even when included as a Stage-1 surrogate, while the three transformer-style \vlm{}s we test are disturbed on $\geq 98\%$ of pairs. We discuss the mechanism in \S\ref{sec:discussion} and its implications as a candidate defense.
+  \item \textbf{C4.} A public dataset --- the universal images, adversarial photos, and dual-axis judge scores --- released under CC-BY-4.0 at \texttt{huggingface.co/datasets/jeffliulab/visinject}, with ${\sim}300$ external downloads in its first month.
+\end{itemize}
+
+\paragraph{Structure.}
+\S\ref{sec:threat} states the threat model. \S\ref{sec:method} summarises the two papers we build on and our dual-dim evaluation. \S\ref{sec:experiments} is the longest section: it lays out the full experiment design (every prompt, every test image, every VLM ensemble). \S\ref{sec:results}--\S\ref{sec:cases} cover aggregate results and case studies. \S\ref{sec:discussion} discusses why the gap between disruption and injection is what it is. \S\ref{sec:future} sketches what \textsc{VisInject} v2 would look like.

@@ -1,0 +1,30 @@
+\section{Introduction}
+\label{sec:intro}
+
+Vision-Language Models (\vlm{}s) have become standard input components in everything from hosted assistants to tool-using agents to MCP-style retrieval pipelines. Recent universal-attack work has shown that an adversarially-perturbed image, optimised once and reused across queries, can override the safety alignment of small open \vlm{}s with reported attack success rates in the $60$--$80\%$ range \citep{rahmatullaev2025universal,qi2024visual,schlarmann2023robustness,bagdasaryan2023imagessounds}. Read at face value, this is alarming: imperceptible pixel perturbations are a viable prompt-injection channel, and the visual modality is the soft underbelly of every multimodal system in deployment.
+
+We argue that the picture is less dramatic, and more interesting, than the headline number suggests. Reported ASR conflates two distinct events:
+
+\begin{itemize}
+  \item \textbf{Output Affected (drift).} The \vlm{}'s response was perturbed in some way --- it became different from what it would have said on the clean image.
+  \item \textbf{Target Injected (payload delivery).} The attacker's chosen target string actually appeared in the response.
+\end{itemize}
+
+These are different things. A response that flips from ``a dog in a field'' to ``a collage of incoherent text fragments'' is affected but contains no payload. A response that emits the target URL inside an otherwise-on-topic answer is a different kind of failure. Universal-attack benchmarks that score success via an LLM-judge prompt of the form ``does the answer differ from the clean baseline'' systematically conflate the two and overstate the attack's value as a delivery vector.
+
+\paragraph{This paper.}
+We compose two existing universal-attack methods --- the Universal Adversarial Attack of \citet{rahmatullaev2025universal} (Stage 1) and the \textsc{AnyAttack} self-supervised encoder--decoder of \citet{zhang2025anyattack} (Stage 2) --- under an \Linf{} budget of $\eps = 16/255$ and PSNR $\approx 25.2$~dB. We add a dual-axis evaluation that scores Influence (Ratcliff-Obershelp drift, deterministic baseline; LLM-judged 4-tier ordinal level) and Precise Injection (LLM-judged 4-tier categorical: \texttt{none / weak / partial / confirmed}) independently, using \textsc{DeepSeek-V4-Pro} \citep{deepseekv3} as the LLM judge in thinking mode (calibrated against Claude Opus 4.7 \citep{anthropic2025opus47} with Cohen's $\kappa = 0.77$ on the injection axis, substantial agreement \citep{landiskoch1977}). We ship the entire LLM-call cache so reviewers can re-derive paper numbers bit-exact without an API key. We run the resulting pipeline on a $7 \times 7 \times 3$ matrix --- seven attack prompts, seven clean test images, three white-box surrogate ensembles --- against four open \vlm{}s, producing $6{,}615$ (clean, adversarial) response pairs.
+
+The headline finding is the gap. Across the same $6{,}615$ pairs, programmatic disruption sits at $66.4\%$ and LLM-judged disruption (substantial+complete) at $46.6\%$, but Precise Injection sits at $0.756\%$ broad / $0.030\%$ verbatim --- a roughly $90\times$ divergence even at the broadest definition of injection. Disruption is broad and architecture-dependent (every transformer-style \vlm{} we test is disturbed on $\geq 99\%$ of pairs by the deterministic measure); payload delivery is rare and image-dependent. The few literal injections that do land cluster on screenshot-like images whose semantics already contain URL- or account-shaped tokens. BLIP-2 shows \emph{zero detectable drift} at $\Linf = 16/255$ across all $2{,}205$ pairs even when used as a Stage-1 surrogate.
+
+\paragraph{Contributions.}
+This paper makes four contributions:
+\begin{itemize}
+  \item \textbf{C1.} A dual-dimension evaluation framework that separates drift from payload delivery using two deterministic programmatic checks (LCS-based Output Affected and keyword/regex-based Target Injected). The evaluation runs end-to-end in $\sim 5$ minutes on a CPU and removes the LLM-judge from the scoring loop. (\S\ref{sec:method-stage3})
+  \item \textbf{C2.} A $6{,}615$-pair systematic sweep over four open \vlm{}s, seven prompts, and seven test images, showing the dual-axis split. The two axes diverge by roughly $90\times$ on the same data ($66.4\%$ programmatic disruption vs $0.756\%$ broad injection by the v3 LLM judge), demonstrating that single-number ``ASR'' metrics conflate two qualitatively different failure modes. (\S\ref{sec:results})
+  \item \textbf{C3.} An architectural observation: BLIP-2 shows \emph{zero detectable drift} at $\Linf = 16/255$ ($0/2{,}205$ pairs registered any Output-Affected score $> 0$) even when included as a Stage-1 surrogate. We enumerate three candidate causes (Stage-2 decoder fusion, the $448\!\to\!224$ resolution + Q-Former double bottleneck, and gradient dilution at training time) and propose a one-shot ablation that would distinguish them. We do not claim a definitive mechanism. (\S\ref{sec:discussion})
+  \item \textbf{C4.} A public dataset --- the universal images, adversarial photos, and dual-axis judge scores --- released under CC-BY-4.0 at \texttt{huggingface.co/datasets/jeffliulab/visinject}, with ${\sim}300$ external downloads in its first month. (\S\ref{sec:conclusion})
+\end{itemize}
+
+\paragraph{Roadmap.}
+\S\ref{sec:related} positions this work against the universal-attack, prompt-injection, and VLM-jailbreak literatures. \S\ref{sec:threat} states the threat model. \S\ref{sec:method} describes the three-stage pipeline. \S\ref{sec:experiments} lays out the experimental setup. \S\ref{sec:results} reports aggregate results, \S\ref{sec:cases} walks through three case studies, and \S\ref{sec:discussion} discusses why drift outpaces injection and what BLIP-2's immunity means for VLM defense design. \S\ref{sec:conclusion} closes with the released artifacts.

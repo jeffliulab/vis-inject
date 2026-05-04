@@ -1,0 +1,19 @@
+# LaTeX aux files
+*.aux
+*.log
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.out
+*.toc
+*.lof
+*.lot
+*.synctex.gz
+*.nav
+*.snm
+*.vrb
+*.run.xml
+
+# Built PDF is committed (whitelisted)
+!main.pdf

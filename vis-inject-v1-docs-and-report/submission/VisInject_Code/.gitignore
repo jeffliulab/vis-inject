@@ -1,0 +1,72 @@
+# ============================================================
+# VisInject .gitignore
+# ============================================================
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+_*.py
+
+# ---- Model weights & caches (large, download on demand) ----
+data/checkpoints/
+data/model_cache/
+**/*.pt
+**/*.pth
+**/*.ckpt
+**/*.safetensors
+**/*.bin
+**/*.npy
+
+# ---- Experiment data (stored on HF Dataset, not in git) ----
+# Only outputs/succeed_injection_examples/ is tracked (small, curated).
+outputs/experiments/
+outputs/experiments_v2_dog_only/
+outputs/universal/
+outputs/adversarial/
+outputs/results/
+outputs/transfer_test/
+outputs/space_demo/
+
+# ---- Binary artifacts ----
+*.pptx
+*.docx
+
+# ---- Secrets ----
+.env
+
+# ---- Virtual environments ----
+venv/
+env/
+.venv/
+ENV/
+
+# ---- IDE ----
+.vscode/
+.idea/
+.cursor/
+*.suo
+*.user
+
+# ---- OS files ----
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# ---- Build artifacts ----
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+
+# ---- Misc ----
+.ipynb_checkpoints/
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+.cache/

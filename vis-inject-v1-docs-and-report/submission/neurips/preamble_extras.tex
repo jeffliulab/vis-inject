@@ -1,0 +1,92 @@
+% preamble_extras.tex --- additional packages and macros, layered on
+% top of neurips_2026.sty. The style file already loads natbib (via
+% \PassOptionsToPackage in main.tex), defines the page geometry, and
+% picks Times. We only add what the body actually uses.
+
+% --- Encoding and microtypography (NeurIPS shell already shows utf8/T1) -
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{microtype}
+
+% --- Hyperlinks + URL typesetting -------------------------------------
+\usepackage{hyperref}
+\usepackage{url}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black!70,
+  citecolor=black!70,
+  urlcolor=black!70,
+  pdftitle={VisInject: Disruption Not Equal Injection -- A Dual-Dimension Evaluation of Universal Adversarial Attacks on Vision-Language Models},
+  pdfauthor={Pang Liu, Yingjie Lao},
+}
+
+% --- Graphics ---------------------------------------------------------
+% Reuse the figures already shipped with the xarchive paper rather than
+% duplicating them here. This means the present file does NOT introduce
+% new image assets; it points at the existing ones.
+\usepackage{graphicx}
+% Three search roots, in order:
+%   1. local figures/ (just the pipeline.tex forwarder lives here),
+%   2. xarchive-report/paper/figures/ (for unprefixed includes like
+%      ORIGIN_dog.png, clean_ORIGIN_bill.png, HF-downloads.png, ...),
+%   3. xarchive-report/paper/ (for explicit "figures/per_vlm.pdf" and
+%      "figures/triptych.pdf" references in sections 06 and 07).
+\graphicspath{{figures/}{../../xarchive-report/paper/figures/}{../../xarchive-report/paper/}}
+
+% --- Tables -----------------------------------------------------------
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{multirow}
+
+% --- Captions and subfigures -----------------------------------------
+\usepackage{caption}
+\captionsetup{font=small, labelfont=bf, skip=4pt}
+\usepackage{subcaption}
+
+% --- Math -------------------------------------------------------------
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{nicefrac}
+
+% --- Code listings ----------------------------------------------------
+\usepackage{listings}
+\usepackage{xcolor}
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  columns=fullflexible,
+  showstringspaces=false,
+  keepspaces=true,
+  frame=single,
+  framerule=0.4pt,
+  rulecolor=\color{black!30},
+  xleftmargin=4pt,
+  xrightmargin=4pt,
+}
+
+% --- TikZ for the pipeline figure ------------------------------------
+\usepackage{tikz}
+\usetikzlibrary{positioning, arrows.meta, shapes.geometric, shadows, fit, backgrounds}
+
+% Colours that the pipeline TikZ figure references by name.
+\definecolor{NavyAccent}{HTML}{1A3A5C}
+\definecolor{InkColor}{HTML}{1F2937}
+\definecolor{SubInk}{HTML}{4B5563}
+\definecolor{RuleGrey}{HTML}{CBD5E1}
+\definecolor{CardBG}{HTML}{F4F6F8}
+\definecolor{AccentBlue}{HTML}{2E86DE}
+\definecolor{GoodGreen}{HTML}{1B8E4F}
+\definecolor{BadRed}{HTML}{C0392B}
+\definecolor{WarnAmber}{HTML}{C97B12}
+
+% --- Convenience macros ----------------------------------------------
+\newcommand{\eg}{\textit{e.g.}}
+\newcommand{\ie}{\textit{i.e.}}
+\newcommand{\vlm}{VLM}
+\newcommand{\Linf}{\ensuremath{L_{\infty}}}
+\newcommand{\eps}{\ensuremath{\varepsilon}}
+\newcommand{\highlight}[1]{\textbf{#1}}
+
+% --- Lists ------------------------------------------------------------
+\usepackage{enumitem}
+\setlist{itemsep=2pt, topsep=3pt, parsep=0pt}

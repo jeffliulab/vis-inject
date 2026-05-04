@@ -1,0 +1,87 @@
+% main.tex --- VisInject in the NeurIPS 2026 template.
+%
+% Source content: report/xarchive-report/paper/ (DO NOT modify that tree).
+% Format: NeurIPS 2026 style (neurips_2026.sty in this directory).
+%
+% Track / mode: currently the [preprint] option, which produces a
+% non-anonymous arXiv-friendly build that keeps the author block, the
+% URLs, and the artefact links visible. To submit blind to the Main
+% Track, remove the [preprint] option in the \usepackage line below
+% and anonymise the author block + the URLs in the body.
+%
+% Switch to a track other than the default by uncommenting one of the
+% labelled \usepackage lines further down (see the template's
+% neurips_2026.tex shell for the full menu).
+
+\documentclass{article}
+
+\PassOptionsToPackage{round, sort&compress, numbers}{natbib}
+\usepackage[preprint]{neurips_2026}
+% \usepackage{neurips_2026}                         % Main Track, blind.
+% \usepackage[main, final]{neurips_2026}            % Main Track, camera-ready.
+% \usepackage[eandd]{neurips_2026}                  % Evaluations & Datasets, blind.
+% \usepackage[eandd, final]{neurips_2026}           % Evaluations & Datasets, camera-ready.
+
+\input{preamble_extras}
+
+% ----------------------------------------------------------------------
+% Title and authors. The [preprint] option is non-anonymous, so the
+% block below is shown verbatim. Under the default (blind) option the
+% style file replaces this with "Anonymous Author(s)".
+% ----------------------------------------------------------------------
+
+\title{VisInject: Disruption $\neq$ Injection ---\\
+A Dual-Dimension Evaluation of Universal Adversarial Attacks\\on Vision-Language Models}
+
+\author{%
+  Pang Liu \\
+  Department of Electrical and Computer Engineering \\
+  Tufts University \\
+  Medford, MA 02155 \\
+  \texttt{pang.liu@tufts.edu} \\
+  \And
+  Yingjie Lao\thanks{Corresponding author.} \\
+  Department of Electrical and Computer Engineering \\
+  Tufts University \\
+  Medford, MA 02155 \\
+  \texttt{yingjie.lao@tufts.edu} \\
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Universal adversarial attacks on aligned multimodal large language models (\vlm{}s) are increasingly reported with attack success rates in the 60--80\% range, suggesting the visual modality is highly vulnerable to imperceptible perturbations as a prompt-injection channel. We argue that this number conflates two distinct events: (i) the model's output was perturbed (\emph{Influence}), and (ii) the attacker's chosen target concept was actually emitted (\emph{Precise Injection}). We compose two existing techniques --- the Universal Adversarial Attack of \citet{rahmatullaev2025universal} and the \textsc{AnyAttack} encoder--decoder of \citet{zhang2025anyattack} --- under an \Linf{} budget of $16/255$, and we add a dual-axis evaluation: a deterministic Ratcliff-Obershelp drift score for Influence (programmatic baseline) plus a 4-tier ordinal categorical \texttt{none/weak/partial/confirmed} for Precise Injection. The judge is \textsc{DeepSeek-V4-Pro} \citep{deepseekv3} in thinking mode, calibrated against Claude Opus 4.7 \citep{anthropic2025opus47} with Cohen's $\kappa = 0.77$ on the injection axis (substantial agreement, \citealp{landiskoch1977}); the entire $4{,}475$-entry SHA-256 input cache ships with the dataset so reviewers can re-derive paper numbers \emph{bit-exact} without an API key. Across $6{,}615$ pairs over four open \vlm{}s, seven attack prompts, and seven test images, the two axes diverge by roughly $90\times$: $66.4\%$ of pairs are programmatically disturbed (LLM-judged $46.6\%$ at the substantial-or-complete tier), but only $0.756\%$ ($50/6{,}615$) reach any non-\texttt{none} injection tier and only $0.030\%$ ($2/6{,}615$) verbatim. The few injections that do land cluster on screenshot- or document-style carriers whose semantics already invite text transcription. BLIP-2 shows \emph{zero detectable drift} at $\Linf = 16/255$ across all $2{,}205$ pairs even when used as a Stage-1 surrogate. We release the full dataset --- 21 universal images, 147 adversarial photos, $6{,}615$ response pairs, the v3 dual-axis judge results, and the cache --- at \url{huggingface.co/datasets/jeffliulab/visinject}.
+\end{abstract}
+
+\input{sections/01_intro}
+\input{sections/02_related_work}
+\input{sections/03_threat_model}
+\input{sections/04_method}
+\input{sections/05_experiments}
+\input{sections/06_results}
+\input{sections/07_case_studies}
+\input{sections/08_discussion}
+\input{sections/09_conclusion}
+\input{sections/10_ethics}
+
+\begin{ack}
+The first author thanks his Tufts Electrical \& Computer Engineering coursework for providing the initial scope, and the corresponding author for guidance and for handling the arXiv submission process. Writing assistance, including iterative editing of the LaTeX source and the dual-axis judge implementation, was provided in part by the Anthropic Claude AI assistant; all empirical results, dataset construction, and final claims are the authors' responsibility. The authors declare no competing interests beyond those disclosed in this acknowledgement.
+\end{ack}
+
+{
+\small
+\bibliographystyle{plainnat}
+\bibliography{refs}
+}
+
+\newpage
+\input{checklist}
+
+\appendix
+\input{sections/A_questions}
+\input{sections/B_json_example}
+\input{sections/C_variants}
+
+\end{document}

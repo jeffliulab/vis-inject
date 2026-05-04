@@ -1,0 +1,71 @@
+\section{Building Blocks}
+\label{sec:method}
+
+\textsc{VisInject} is the composition of two named methods from the literature plus a small evaluation contribution of our own. Figure~\ref{fig:pipeline} shows the resulting three-stage pipeline.
+
+\begin{figure}[t]
+  \centering
+  \resizebox{\textwidth}{!}{\input{figures/pipeline}}
+  \caption{The three-stage \textsc{VisInject} pipeline. Stage~1 runs the \textbf{Universal Adversarial Attack (UAA)} of \citet{rahmatullaev2025universal} to obtain a single universal adversarial image against $N$ white-box \vlm{}s; Stage~2 uses the pretrained \textbf{AnyAttack} encoder-decoder of \citet{zhang2025anyattack} to transport that signal onto an arbitrary clean photo under an \Linf{} budget; Stage~3 evaluates each (clean, adversarial) response pair along two independent axes.}
+  \label{fig:pipeline}
+\end{figure}
+
+\subsection{Stage 1 --- Universal Adversarial Attack \citep{rahmatullaev2025universal}}
+\label{sec:method-stage1}
+
+The first paper introduces what its authors call a \emph{Universal Adversarial Attack} (UAA) on \emph{aligned multimodal LLMs}. ``Universal'' means \emph{prompt-universal}: the same image drives the target phrase regardless of how the user phrases their question. ``Aligned'' refers to the safety-tuning step that target \vlm{}s typically receive --- the paper's contribution is showing that UAA bypasses this alignment.
+
+The mechanism, as we use it, has four named pieces:
+
+\begin{itemize}
+  \item \textbf{Image reparameterisation.} Pixels are reparameterised as $x = 0.5 + \gamma \tanh(z_1)$ so the optimiser sees an unconstrained latent $z_1$ but the rendered image is automatically in $[0,1]$ --- no projection step needed.
+  \item \textbf{Masked cross-entropy loss.} For surrogate \vlm{} $f_i$, prompt $p$, and target phrase $y^\ast$, the per-step loss is the \emph{masked} token-level cross-entropy of the target tokens given the image and prompt. Every model wrapper in our codebase exposes a \texttt{compute\_masked\_ce\_loss} method that implements exactly this.
+  \item \textbf{Multi-prompt training.} Each PGD step samples one prompt at random from the 60-question pool of Appendix~\ref{app:questions}. The training loss is therefore an average over prompt phrasings, which is what makes the resulting image \emph{prompt-universal}.
+  \item \textbf{Multi-model ensemble loss.} The per-step loss is summed across all $N$ surrogate \vlm{}s in the ensemble. This is what gives the universal image cross-architecture coverage; we sweep $N \in \{2, 3, 4\}$ as configurations \texttt{2m}, \texttt{3m}, \texttt{4m}.
+\end{itemize}
+
+We optimise with Adam (lr~$10^{-2}$, $2{,}000$ steps). We additionally enable the paper's \emph{quantization-noise robustness} trick (a small Gaussian noise added during training to keep the attack robust under 8-bit quantisation when saved as PNG); the paper's \emph{multi-answer attack}, \emph{localisation crops}, and Gaussian-blur defences are turned off in our default configuration. The output is a single ``universal adversarial image'' $x_u \in [0,1]^{H \times W \times 3}$.
+
+What this paper gives us is the \emph{signal}: an image with an attack baked in. What is missing is realism --- $x_u$ does not look like a real photo, so a user uploading it would be flagged.
+
+\subsection{Stage 2 --- AnyAttack \citep{zhang2025anyattack}}
+\label{sec:method-stage2}
+
+The second paper, titled ``\textsc{AnyAttack}: Towards Large-Scale Self-Supervised Generation of Targeted Adversarial Examples for Vision-Language Models'', builds a foundation model for adversarial perturbation. The pipeline is an encoder-decoder pair: a frozen CLIP ViT-B/16 encoder \citep{radford2021clip} maps any input image to a $768$-d feature, and a learned decoder maps that feature to an \Linf{}-bounded noise tensor $\delta$ shaped like the target image. The decoder is trained \emph{self-supervised} on bidirectional COCO pairs (the \texttt{coco\_bi.pt} checkpoint we use), without any task-specific labels --- this is the ``foundation model'' framing in the paper.
+
+We use the public weights as-is, with no retraining. Stage~2 in our pipeline is therefore essentially free per new clean photo: encode $x_u$, decode to $\delta(x_u)$, project to the $\Linf$ ball, and add to a clean photo $x_c$:
+\begin{equation}
+  x_a \;=\; \mathrm{clip}_{[0,1]}\!\Bigl(x_c + \mathrm{clip}_{[-\eps,\eps]}\bigl(\delta(x_u)\bigr)\Bigr), \qquad \eps = 16/255.
+\end{equation}
+
+What this paper gives us is the \emph{carrier}: a way to deposit an adversarial perturbation onto any real photo, fully reproducible from public weights. What it does \emph{not} give us is a chosen target. \textsc{AnyAttack} on its own is a \emph{targeted-adversarial-example generator} only in the sense that it can be conditioned on an arbitrary target image; it has no built-in mechanism to encode a specific output phrase.
+
+\subsection{Composition --- why it works}
+
+Stage~1 alone makes a strong but obviously-fake adversarial image. Stage~2 alone makes any photo subtly adversarial, but with no specific output target. Composed: Stage~1's universal image already encodes the target phrase in CLIP feature space; passing it through Stage~2's CLIP+Decoder transports that target into noise that can be added to a real photo. The resulting adversarial photo looks like the original ($\Linf = 16/255$, PSNR $\approx 25.2$~dB) and inherits the target signal --- with one important caveat that we measure in \S\ref{sec:results}: the decoder partially erases payload specifics.
+
+\subsection{Stage 3 --- dual-axis evaluation (our contribution)}
+\label{sec:method-stage3}
+
+Stage~2 fuses the attacker's signal into the clean image's \emph{CLIP feature space}: by construction, the injected payload is conceptual, not literal text. A \vlm{} that ``hears'' the perturbation may emit the target phrase verbatim, a paraphrase, or a topically-related fragment, depending on its decoder's idiosyncrasies. To capture this gradient, Stage~3 scores every (clean, adversarial) response pair along two \emph{independent} axes:
+
+\begin{itemize}
+  \item \textbf{Influence (drift)} --- did the adversarial response \emph{substantially deviate} from the clean response in answering the user's question? Reported as a 4-tier ordinal level: \texttt{none}, \texttt{slight}, \texttt{substantial}, \texttt{complete}.
+  \item \textbf{Precise Injection (payload delivery)} --- did the adversarial response contain content matching the attacker's target concept that the clean response does not? Reported as a 4-tier ordinal level: \texttt{none}, \texttt{weak}, \texttt{partial}, \texttt{confirmed}, where:
+    \begin{itemize}
+      \item \texttt{confirmed} means the target phrase appears verbatim or near-verbatim;
+      \item \texttt{partial} means a semantic-class variant appears (e.g.\ ``account number'' for ``card number'');
+      \item \texttt{weak} means a theme/category fragment appears (e.g.\ ``PRESIDENT'' for an election-related target);
+      \item \texttt{none} means no target-related content beyond what is already in the clean response.
+    \end{itemize}
+\end{itemize}
+
+The two checks are deliberately decoupled. Drift and payload delivery are different events, and lumping them together hides the most important empirical finding of this study: that the same adversarial perturbations which disturb most Qwen-style responses deliver the chosen target phrase in only a fraction of one percent of cases (\S\ref{sec:results}). A single ``attack-success'' number would not have made that gap visible.
+
+\paragraph{Judge implementation.} Both axes are evaluated by a single LLM call per pair, returning a structured JSON record containing \texttt{influence\_level}, \texttt{injection\_level}, and a one-sentence rationale citing the spans on which each decision was based. We use \textsc{DeepSeek-V4-Pro} \citep{deepseekv3} in thinking mode (\texttt{reasoning\_effort=high}) at \texttt{temperature=0}. To suppress the well-documented position bias of LLM judges \citep{zheng2023llmjudge}, the (clean, adversarial) presentation order is randomised per pair via SHA-256 of the inputs, with the \texttt{A/B} mapping always disclosed in the prompt so the model does not have to guess. We also keep a deterministic programmatic ``Influence'' score (Ratcliff-Obershelp drift via Python's \texttt{difflib}) as a baseline that anyone can re-derive in pure CPU --- this is reported alongside the LLM number, and the two should agree within a few percentage points (Table~\ref{tab:per-vlm}).
+
+\paragraph{Choice of LLM judge.} Pure programmatic matching, while attractive for reproducibility, systematically under-counts the concept-level injections that Stage~2's CLIP-space fusion produces. The source paper for our Stage~2 \citep{zhang2025anyattack} explicitly uses an LLM-as-judge with semantic-similarity threshold for the same reason. Using an LLM judge therefore aligns our methodology with the field's standard for this attack class while letting us still cite a reproducible programmatic baseline.
+
+\paragraph{Calibration against a human labeller.} To validate the LLM judge, we asked Claude Opus 4.7 \citep{anthropic2025opus47} --- blinded to DeepSeek's output --- to label a stratified random sample of $100$ pairs (one per (prompt, VLM, question-category) cell where available, fixed seed). To inject positive-class variance for the injection axis, we additionally included the $10$ curated injection cases from \texttt{succeed\_injection\_examples/manifest.json} (the same cases discussed in \S\ref{sec:cases}). Cohen's $\kappa$ between Claude and DeepSeek is \textbf{$\kappa_{\mathrm{lin}} = 0.64$} (linear-weighted, $n=100$) on the influence axis and \textbf{$\kappa_{\mathrm{unweighted}} = 0.77$} ($n=110$) on the injection axis, both above the conventional ``substantial agreement'' threshold of $0.61$ \citep{landiskoch1977}. The DeepSeek judge is uniformly slightly \emph{more conservative} than the human labeller --- it recognises every literal injection but misses two of the borderline ``partial'' email cases --- so the headline injection rates we report are if anything an under-count, not an over-count.
+
+\paragraph{Reproducibility.} Every LLM call is keyed by SHA-256 of \texttt{(rubric\_template, model\_id, target\_phrase, question, sorted(clean, adv))} and the result --- including the full reasoning trace --- is written to a \texttt{judge\_cache.json} file shipped with the dataset. Reviewers therefore have three independent re-grading paths: \emph{(a)} \emph{cache replay}, \texttt{python -m evaluate.replay --cache judge\_cache.json}, which reproduces the paper numbers bit-exact and requires no API key; \emph{(b)} \emph{API re-run} with their own DeepSeek key (DeepSeek does not currently expose a deterministic \texttt{seed} parameter, so this path agrees with the paper to within $\sim$$5\%$ at the per-pair level but not bit-exact); \emph{(c)} \emph{cross-judge} with any other LLM under the same rubric (the rubric template SHA-256 is published in the dataset's \texttt{evaluator\_manifest.json}).
